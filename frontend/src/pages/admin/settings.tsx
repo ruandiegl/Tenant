@@ -3,12 +3,12 @@ import { Building2, Percent, ShieldCheck } from "lucide-react";
 import { useTenant } from "../../app/providers/tenant-provider";
 import { PageHeader } from "../../components/ui/page-header";
 import { StatusBadge } from "../../components/ui/status-badge";
-import { mockApi } from "../../services/mock-api";
+import { adminService } from "../../services/admin";
 import { formatCurrency } from "../../utils/format";
 
 export function AdminSettings() {
   const { tenant, settings } = useTenant();
-  const { data } = useQuery({ queryKey: ["admin-bundle"], queryFn: mockApi.getTenantAdminBundle });
+  const { data } = useQuery({ queryKey: ["admin-bundle"], queryFn: adminService.getTenantAdminBundle });
 
   return (
     <section className="screen">

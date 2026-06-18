@@ -17,6 +17,22 @@ export const listCategories: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const updateCategory: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.updateCategory(req.tenantId!, req.params.id, req.body));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const deleteCategory: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.deleteCategory(req.tenantId!, req.params.id));
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const createProduct: RequestHandler = async (req, res, next) => {
   try {
     return res.status(201).json(await service.createProduct(req.tenantId!, req.body));
@@ -36,6 +52,14 @@ export const listProducts: RequestHandler = async (req, res, next) => {
 export const updateProduct: RequestHandler = async (req, res, next) => {
   try {
     return res.json(await service.updateProduct(req.tenantId!, req.params.id, req.body));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const deleteProduct: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.deleteProduct(req.tenantId!, req.params.id));
   } catch (error) {
     return next(error);
   }

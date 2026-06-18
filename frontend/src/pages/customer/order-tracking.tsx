@@ -5,7 +5,7 @@ import { useSocket } from "../../app/providers/socket-provider";
 import { OrderCard } from "../../components/orders/order-card";
 import { PageHeader } from "../../components/ui/page-header";
 import { StatusBadge } from "../../components/ui/status-badge";
-import { mockApi } from "../../services/mock-api";
+import { ordersService } from "../../services/orders";
 import { formatTime } from "../../utils/format";
 
 const timeline = ["PLACED", "ACCEPTED", "PREPARING", "READY", "DISPATCHED", "COMPLETED"];
@@ -15,7 +15,7 @@ export function OrderTracking() {
   const socket = useSocket();
   const { data: order } = useQuery({
     queryKey: ["order", publicCode],
-    queryFn: () => mockApi.getOrderByPublicCode(publicCode)
+    queryFn: () => ordersService.getByPublicCode(publicCode)
   });
 
   if (!order) {

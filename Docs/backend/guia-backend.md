@@ -33,7 +33,7 @@ O banco usado e PostgreSQL.
 A conexao padrao esta em `backend/.env.example`:
 
 ```txt
-DATABASE_URL=postgresql://podepedir:Conquistas%4007@localhost:5432/podepedir?schema=public
+DATABASE_URL=postgresql://podepedir:Conquistas%4007@localhost:5433/podepedir?schema=public
 ```
 
 O schema Prisma fica em:
@@ -58,7 +58,7 @@ docker compose up --build
 
 Servicos criados:
 
-- PostgreSQL em `localhost:5432`
+- PostgreSQL em `localhost:5433`
 - Backend em `localhost:3333`
 
 Depois que subir, acesse:

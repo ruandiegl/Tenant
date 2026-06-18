@@ -138,7 +138,7 @@ export type ProductAvailability = BaseEntity & {
   productId: string;
   branchId: string;
   isAvailable: boolean;
-  stockQuantity?: number;
+  stockQuantity?: number | null;
 };
 
 export type OptionGroup = BaseEntity & {

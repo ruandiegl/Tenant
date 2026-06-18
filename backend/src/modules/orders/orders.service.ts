@@ -85,7 +85,7 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
       status: "ACTIVE",
       deletedAt: null
     },
-    include: { optionGroups: { include: { options: true } } }
+    include: { optionGroups: { include: { options: true } }, availability: { where: { branchId: data.branchId } } }
   });
 
   if (products.length !== data.items.length) {
@@ -100,6 +100,12 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
 
   const preparedItems = data.items.map((item) => {
     const product = products.find((entry) => entry.id === item.productId)!;
+    const availability = product.availability[0];
+
+    if (availability && (!availability.isAvailable || (availability.stockQuantity !== null && availability.stockQuantity < item.quantity))) {
+      throw new AppError(`Insufficient stock for product ${product.name}`, 400);
+    }
+
     const unitPrice = product.promotionalPrice ?? product.basePrice;
     const options = item.options?.map((selectedOption) => {
       const option = product.optionGroups.flatMap((group) => group.options).find((entry) => entry.id === selectedOption.optionItemId);
@@ -154,6 +160,29 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
   const code = publicCode();
 
   const order = await prisma.$transaction(async (tx) => {
+    for (const item of preparedItems) {
+      const availability = products.find((product) => product.id === item.productId)?.availability[0];
+
+      if (availability?.stockQuantity !== null && availability?.stockQuantity !== undefined) {
+        const result = await tx.productAvailability.updateMany({
+          where: {
+            tenantId: tenant.id,
+            productId: item.productId,
+            branchId: branch.id,
+            stockQuantity: { gte: item.quantity }
+          },
+          data: {
+            stockQuantity: { decrement: item.quantity },
+            isAvailable: availability.stockQuantity - item.quantity > 0
+          }
+        });
+
+        if (result.count === 0) {
+          throw new AppError(`Insufficient stock for product ${item.productNameSnapshot}`, 400);
+        }
+      }
+    }
+
     const customer = data.customerEmail || data.customerPhone
       ? await tx.customer.upsert({
           where: data.customerEmail

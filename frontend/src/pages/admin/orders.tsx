@@ -1,10 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { OrderCard } from "../../components/orders/order-card";
 import { PageHeader } from "../../components/ui/page-header";
-import { mockApi } from "../../services/mock-api";
+import { ordersService } from "../../services/orders";
+import { OrderStatus } from "../../types/database";
 
 export function AdminOrders() {
-  const { data: orders } = useQuery({ queryKey: ["admin-orders"], queryFn: mockApi.getOrders });
+  const queryClient = useQueryClient();
+  const { data: orders } = useQuery({ queryKey: ["admin-orders"], queryFn: ordersService.list });
+  const updateStatus = useMutation({
+    mutationFn: ({ orderId, status }: { orderId: string; status: OrderStatus }) => ordersService.updateStatus(orderId, status),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-summary"] });
+    }
+  });
 
   return (
     <section className="screen">
@@ -23,7 +32,12 @@ export function AdminOrders() {
 
       <div className="list-stack">
         {orders?.map((order) => (
-          <OrderCard key={order.id} order={order} />
+          <OrderCard
+            isUpdating={updateStatus.isPending}
+            key={order.id}
+            onStatusChange={(orderId, status) => updateStatus.mutate({ orderId, status })}
+            order={order}
+          />
         ))}
       </div>
     </section>

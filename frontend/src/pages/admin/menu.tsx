@@ -1,50 +1,305 @@
-import { useQuery } from "@tanstack/react-query";
-import { PackageCheck, Plus } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { Edit3, PackageCheck, Plus, Save, Trash2, X } from "lucide-react";
+import { CategoryDraft, ProductDraft, useCatalog } from "../../app/providers/catalog-provider";
 import { ProductCard } from "../../components/menu/product-card";
 import { PageHeader } from "../../components/ui/page-header";
 import { StatusBadge } from "../../components/ui/status-badge";
-import { mockApi } from "../../services/mock-api";
+import { MenuCategory, Product, ProductStatus } from "../../types/database";
+import { formatCurrency } from "../../utils/format";
+
+const emptyCategoryDraft: CategoryDraft = {
+  name: "",
+  description: "",
+  imageUrl: "",
+  status: "ACTIVE"
+};
+
+const emptyProductDraft: ProductDraft = {
+  categoryId: "",
+  name: "",
+  description: "",
+  sku: "",
+  imageUrl: "",
+  basePrice: 0,
+  promotionalPrice: undefined,
+  costPrice: undefined,
+  preparationTime: 20,
+  status: "ACTIVE",
+  isFeatured: false,
+  stockQuantity: 10,
+  ingredients: [],
+  complements: []
+};
+
+function categoryToDraft(category: MenuCategory): CategoryDraft {
+  return {
+    name: category.name,
+    description: category.description ?? "",
+    imageUrl: category.imageUrl ?? "",
+    status: category.status
+  };
+}
+
+function productToDraft(product: Product, stockQuantity: number): ProductDraft {
+  const ingredientGroup = product.optionGroups.find((group) => group.name === "Ingredientes");
+  const complementGroup = product.optionGroups.find((group) => group.name === "Complementos");
+
+  return {
+    categoryId: product.categoryId,
+    name: product.name,
+    description: product.description ?? "",
+    sku: product.sku ?? "",
+    imageUrl: product.imageUrl ?? "",
+    basePrice: product.basePrice,
+    promotionalPrice: product.promotionalPrice,
+    costPrice: product.costPrice,
+    preparationTime: product.preparationTime,
+    status: product.status === "OUT_OF_STOCK" && stockQuantity > 0 ? "ACTIVE" : product.status,
+    isFeatured: product.isFeatured,
+    stockQuantity,
+    ingredients: ingredientGroup?.items.map((item) => item.name) ?? [],
+    complements: complementGroup?.items.map((item) => ({ name: item.name, price: item.price })) ?? []
+  };
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export function AdminMenu() {
-  const { data } = useQuery({ queryKey: ["admin-menu"], queryFn: mockApi.getPublicMenu });
+  const {
+    categories,
+    products,
+    productAvailability,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    getProductStock,
+    loading,
+    error,
+    refreshAdminCatalog
+  } = useCatalog();
+  const [categoryDraft, setCategoryDraft] = useState<CategoryDraft>(emptyCategoryDraft);
+  const [productDraft, setProductDraft] = useState<ProductDraft>({ ...emptyProductDraft, categoryId: categories[0]?.id ?? "" });
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [ingredientInput, setIngredientInput] = useState("");
+  const [complementInput, setComplementInput] = useState({ name: "", price: "" });
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    void refreshAdminCatalog();
+  }, [refreshAdminCatalog]);
+
+  const openCreateCategory = () => {
+    setCategoryDraft(emptyCategoryDraft);
+    setEditingCategoryId(null);
+    setCategoryModalOpen(true);
+  };
+
+  const openEditCategory = (category: MenuCategory) => {
+    setCategoryDraft(categoryToDraft(category));
+    setEditingCategoryId(category.id);
+    setCategoryModalOpen(true);
+  };
+
+  const closeCategoryModal = () => {
+    setCategoryModalOpen(false);
+    setCategoryDraft(emptyCategoryDraft);
+    setEditingCategoryId(null);
+  };
+
+  const openCreateProduct = () => {
+    setProductDraft({ ...emptyProductDraft, categoryId: categories[0]?.id ?? "" });
+    setEditingProductId(null);
+    setIngredientInput("");
+    setComplementInput({ name: "", price: "" });
+    setProductModalOpen(true);
+  };
+
+  const openEditProduct = (product: Product) => {
+    setProductDraft(productToDraft(product, getProductStock(product.id)));
+    setEditingProductId(product.id);
+    setIngredientInput("");
+    setComplementInput({ name: "", price: "" });
+    setProductModalOpen(true);
+  };
+
+  const closeProductModal = () => {
+    setProductModalOpen(false);
+    setProductDraft({ ...emptyProductDraft, categoryId: categories[0]?.id ?? "" });
+    setEditingProductId(null);
+    setIngredientInput("");
+    setComplementInput({ name: "", price: "" });
+  };
+
+  const handleCategorySubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (categoryDraft.name.trim().length < 2) {
+      setActionError("Informe um nome de categoria com pelo menos 2 caracteres.");
+      return;
+    }
+
+    setSubmitting(true);
+    setActionError(null);
+
+    try {
+      if (editingCategoryId) {
+        await updateCategory(editingCategoryId, categoryDraft);
+      } else {
+        await createCategory(categoryDraft);
+      }
+
+      closeCategoryModal();
+    } catch (error) {
+      setActionError(errorMessage(error, "Nao foi possivel salvar a categoria."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleProductSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (productDraft.name.trim().length < 2 || !productDraft.categoryId) {
+      setActionError("Informe nome do produto e categoria antes de salvar.");
+      return;
+    }
+
+    setSubmitting(true);
+    setActionError(null);
+
+    try {
+      if (editingProductId) {
+        await updateProduct(editingProductId, productDraft);
+      } else {
+        await createProduct(productDraft);
+      }
+
+      closeProductModal();
+    } catch (error) {
+      setActionError(errorMessage(error, "Nao foi possivel salvar o produto."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    setActionError(null);
+
+    try {
+      await deleteCategory(categoryId);
+    } catch (error) {
+      setActionError(errorMessage(error, "Nao foi possivel excluir a categoria."));
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    setActionError(null);
+
+    try {
+      await deleteProduct(productId);
+    } catch (error) {
+      setActionError(errorMessage(error, "Nao foi possivel excluir o produto."));
+    }
+  };
+
+  const addIngredient = () => {
+    const nextIngredient = ingredientInput.trim();
+    if (!nextIngredient) return;
+
+    setProductDraft((current) => ({
+      ...current,
+      ingredients: [...current.ingredients, nextIngredient]
+    }));
+    setIngredientInput("");
+  };
+
+  const removeIngredient = (index: number) => {
+    setProductDraft((current) => ({
+      ...current,
+      ingredients: current.ingredients.filter((_, itemIndex) => itemIndex !== index)
+    }));
+  };
+
+  const addComplement = () => {
+    const name = complementInput.name.trim();
+    if (!name) return;
+
+    setProductDraft((current) => ({
+      ...current,
+      complements: [
+        ...current.complements,
+        {
+          name,
+          price: Number(complementInput.price.replace(",", ".")) || 0
+        }
+      ]
+    }));
+    setComplementInput({ name: "", price: "" });
+  };
+
+  const removeComplement = (index: number) => {
+    setProductDraft((current) => ({
+      ...current,
+      complements: current.complements.filter((_, itemIndex) => itemIndex !== index)
+    }));
+  };
 
   return (
     <section className="screen">
       <PageHeader
         eyebrow="Cardapio"
         title="Categorias e produtos"
-        description="Mock com MenuCategory, Product, OptionGroup, OptionItem e ProductAvailability."
-        actions={
-          <button className="pill-button">
-            <Plus size={17} /> Produto
-          </button>
-        }
+        description="Gerencie o que aparece no menu do cliente, com status, complementos e estoque."
       />
+      {error || actionError ? <p className="form-error">{actionError ?? error}</p> : null}
+      {loading ? <p className="muted-text">Carregando catalogo...</p> : null}
 
       <div className="admin-grid">
         <article className="panel">
-          <h2>Categorias</h2>
-          {data?.categories.map((category) => (
-            <div className="rank-row" key={category.id}>
+          <div className="panel-title-row">
+            <h2>Categorias</h2>
+            <button className="ghost-icon-button emphasis" onClick={openCreateCategory}>
+              <Plus size={18} /> Categoria
+            </button>
+          </div>
+
+          {categories.map((category) => (
+            <div className="management-row" key={category.id}>
               <div>
                 <strong>{category.name}</strong>
-                <span>{category.description}</span>
+                <span>{category.description || "Sem descricao"}</span>
               </div>
               <StatusBadge status={category.status} />
+              <div className="row-actions">
+                <button aria-label={`Editar ${category.name}`} onClick={() => openEditCategory(category)}>
+                  <Edit3 size={16} />
+                </button>
+                <button aria-label={`Excluir ${category.name}`} onClick={() => void handleDeleteCategory(category.id)}>
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           ))}
         </article>
 
         <article className="panel">
-          <h2>Disponibilidade</h2>
-          {data?.productAvailability.map((availability) => {
-            const product = data.products.find((item) => item.id === availability.productId);
+          <h2>Estoque</h2>
+          {productAvailability.map((availability) => {
+            const product = products.find((item) => item.id === availability.productId);
             return (
-              <div className="rank-row" key={availability.id}>
+              <div className="management-row stock-row" key={availability.id}>
                 <div>
                   <strong>{product?.name}</strong>
-                  <span>Estoque {availability.stockQuantity ?? "sem limite"}</span>
+                  <span>Estoque {availability.stockQuantity ?? 0}</span>
                 </div>
+                <StatusBadge status={product?.status ?? "INACTIVE"} />
                 <PackageCheck size={18} />
               </div>
             );
@@ -52,11 +307,319 @@ export function AdminMenu() {
         </article>
       </div>
 
-      <div className="product-grid">
-        {data?.products.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </div>
+      <section className="section-block">
+        <div className="panel-title-row">
+          <h2>Produtos cadastrados</h2>
+          <button className="pill-button" onClick={openCreateProduct}>
+            <Plus size={17} /> Produto
+          </button>
+        </div>
+
+        <div className="catalog-product-list">
+          {products.map((product) => {
+            const category = categories.find((item) => item.id === product.categoryId);
+            const complements = product.optionGroups.find((group) => group.name === "Complementos")?.items ?? [];
+            const ingredients = product.optionGroups.find((group) => group.name === "Ingredientes")?.items ?? [];
+
+            return (
+              <article className="catalog-product-row" key={product.id}>
+                <ProductCard product={product} stockQuantity={getProductStock(product.id)} />
+                <div className="catalog-product-details">
+                  <div>
+                    <span className="eyebrow">{category?.name ?? "Sem categoria"}</span>
+                    <h3>{product.name}</h3>
+                    <p>{product.description}</p>
+                  </div>
+                  <div className="catalog-meta-grid">
+                    <span>Base {formatCurrency(product.basePrice)}</span>
+                    <span>Custo {formatCurrency(product.costPrice ?? 0)}</span>
+                    <span>Estoque {getProductStock(product.id)}</span>
+                    <StatusBadge status={product.status} />
+                  </div>
+                  <p className="muted-text">
+                    Ingredientes: {ingredients.map((item) => item.name).join(", ") || "nao informado"}
+                  </p>
+                  <p className="muted-text">
+                    Complementos: {complements.map((item) => `${item.name} (${formatCurrency(item.price)})`).join(", ") || "sem complementos"}
+                  </p>
+                  <div className="row-actions wide">
+                    <button onClick={() => openEditProduct(product)}>
+                      <Edit3 size={16} /> Editar
+                    </button>
+                    <button onClick={() => void handleDeleteProduct(product.id)}>
+                      <Trash2 size={16} /> Excluir
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      {categoryModalOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <form className="modal-card" onSubmit={handleCategorySubmit} role="dialog" aria-modal="true" aria-label="Cadastro de categoria">
+            <div className="modal-header">
+              <div>
+                <span className="eyebrow">Categoria</span>
+                <h2>{editingCategoryId ? "Editar categoria" : "Nova categoria"}</h2>
+              </div>
+              <button aria-label="Fechar modal" className="ghost-icon-button" onClick={closeCategoryModal} type="button">
+                <X size={18} />
+              </button>
+            </div>
+
+            <label className="field">
+              <span>Nome</span>
+              <div>
+                <input value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value })} />
+              </div>
+            </label>
+
+            <label className="field">
+              <span>Descricao</span>
+              <div>
+                <input
+                  value={categoryDraft.description}
+                  onChange={(event) => setCategoryDraft({ ...categoryDraft, description: event.target.value })}
+                />
+              </div>
+            </label>
+
+            <label className="field">
+              <span>Imagem</span>
+              <div>
+                <input value={categoryDraft.imageUrl} onChange={(event) => setCategoryDraft({ ...categoryDraft, imageUrl: event.target.value })} />
+              </div>
+            </label>
+
+            <label className="field">
+              <span>Status</span>
+              <div>
+                <select
+                  value={categoryDraft.status}
+                  onChange={(event) => setCategoryDraft({ ...categoryDraft, status: event.target.value as ProductStatus })}
+                >
+                  <option value="ACTIVE">Ativa</option>
+                  <option value="INACTIVE">Inativa</option>
+                  <option value="ARCHIVED">Arquivada</option>
+                </select>
+              </div>
+            </label>
+
+            <button className="primary-button" disabled={submitting} type="submit">
+              <Save size={17} /> {editingCategoryId ? "Salvar categoria" : "Criar categoria"}
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      {productModalOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <form className="modal-card product-modal" onSubmit={handleProductSubmit} role="dialog" aria-modal="true" aria-label="Cadastro de produto">
+            <div className="modal-header">
+              <div>
+                <span className="eyebrow">Produto</span>
+                <h2>{editingProductId ? "Editar produto" : "Novo produto"}</h2>
+              </div>
+              <button aria-label="Fechar modal" className="ghost-icon-button" onClick={closeProductModal} type="button">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="form-grid two-columns">
+              <label className="field">
+                <span>Categoria</span>
+                <div>
+                  <select
+                    value={productDraft.categoryId || categories[0]?.id || ""}
+                    onChange={(event) => setProductDraft({ ...productDraft, categoryId: event.target.value })}
+                  >
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </label>
+
+              <label className="field">
+                <span>Status</span>
+                <div>
+                  <select
+                    value={productDraft.status}
+                    onChange={(event) => setProductDraft({ ...productDraft, status: event.target.value as ProductStatus })}
+                  >
+                    <option value="ACTIVE">Ativo</option>
+                    <option value="INACTIVE">Inativo</option>
+                    <option value="OUT_OF_STOCK">Esgotado</option>
+                    <option value="ARCHIVED">Arquivado</option>
+                  </select>
+                </div>
+              </label>
+
+              <label className="field">
+                <span>Nome</span>
+                <div>
+                  <input value={productDraft.name} onChange={(event) => setProductDraft({ ...productDraft, name: event.target.value })} />
+                </div>
+              </label>
+
+              <label className="field">
+                <span>SKU</span>
+                <div>
+                  <input value={productDraft.sku} onChange={(event) => setProductDraft({ ...productDraft, sku: event.target.value })} />
+                </div>
+              </label>
+
+              <label className="field">
+                <span>Preco base</span>
+                <div>
+                  <input
+                    min="0"
+                    step="0.01"
+                    type="number"
+                    value={productDraft.basePrice}
+                    onChange={(event) => setProductDraft({ ...productDraft, basePrice: Number(event.target.value) })}
+                  />
+                </div>
+              </label>
+
+              <label className="field">
+                <span>Preco promocional</span>
+                <div>
+                  <input
+                    min="0"
+                    step="0.01"
+                    type="number"
+                    value={productDraft.promotionalPrice ?? ""}
+                    onChange={(event) =>
+                      setProductDraft({
+                        ...productDraft,
+                        promotionalPrice: event.target.value ? Number(event.target.value) : undefined
+                      })
+                    }
+                  />
+                </div>
+              </label>
+
+              <label className="field">
+                <span>Custo</span>
+                <div>
+                  <input
+                    min="0"
+                    step="0.01"
+                    type="number"
+                    value={productDraft.costPrice ?? ""}
+                    onChange={(event) =>
+                      setProductDraft({ ...productDraft, costPrice: event.target.value ? Number(event.target.value) : undefined })
+                    }
+                  />
+                </div>
+              </label>
+
+              <label className="field">
+                <span>Estoque</span>
+                <div>
+                  <input
+                    min="0"
+                    type="number"
+                    value={productDraft.stockQuantity}
+                    onChange={(event) => setProductDraft({ ...productDraft, stockQuantity: Number(event.target.value) })}
+                  />
+                </div>
+              </label>
+
+              <label className="field">
+                <span>Preparo em minutos</span>
+                <div>
+                  <input
+                    min="1"
+                    type="number"
+                    value={productDraft.preparationTime}
+                    onChange={(event) => setProductDraft({ ...productDraft, preparationTime: Number(event.target.value) })}
+                  />
+                </div>
+              </label>
+
+              <label className="toggle-field">
+                <input
+                  checked={productDraft.isFeatured}
+                  onChange={(event) => setProductDraft({ ...productDraft, isFeatured: event.target.checked })}
+                  type="checkbox"
+                />
+                <span>Mostrar nos destaques</span>
+              </label>
+            </div>
+
+            <label className="field">
+              <span>Descricao</span>
+              <div>
+                <input
+                  value={productDraft.description}
+                  onChange={(event) => setProductDraft({ ...productDraft, description: event.target.value })}
+                />
+              </div>
+            </label>
+
+            <label className="field">
+              <span>Imagem</span>
+              <div>
+                <input value={productDraft.imageUrl} onChange={(event) => setProductDraft({ ...productDraft, imageUrl: event.target.value })} />
+              </div>
+            </label>
+
+            <div className="editable-list-block">
+              <span>Ingredientes</span>
+              <div className="inline-add-row">
+                <input value={ingredientInput} onChange={(event) => setIngredientInput(event.target.value)} placeholder="Ex: queijo cheddar" />
+                <button aria-label="Adicionar ingrediente" onClick={addIngredient} type="button">
+                  <Plus size={18} />
+                </button>
+              </div>
+              <div className="editable-chip-list">
+                {productDraft.ingredients.map((ingredient, index) => (
+                  <button key={`${ingredient}-${index}`} onClick={() => removeIngredient(index)} type="button">
+                    {ingredient} <X size={14} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="editable-list-block">
+              <span>Complementos</span>
+              <div className="inline-add-row complement-row">
+                <input
+                  value={complementInput.name}
+                  onChange={(event) => setComplementInput({ ...complementInput, name: event.target.value })}
+                  placeholder="Ex: bacon"
+                />
+                <input
+                  value={complementInput.price}
+                  onChange={(event) => setComplementInput({ ...complementInput, price: event.target.value })}
+                  placeholder="Valor"
+                />
+                <button aria-label="Adicionar complemento" onClick={addComplement} type="button">
+                  <Plus size={18} />
+                </button>
+              </div>
+              <div className="editable-chip-list">
+                {productDraft.complements.map((complement, index) => (
+                  <button key={`${complement.name}-${index}`} onClick={() => removeComplement(index)} type="button">
+                    {complement.name} {formatCurrency(complement.price)} <X size={14} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button className="primary-button" disabled={submitting} type="submit">
+              <Save size={17} /> {editingProductId ? "Salvar produto" : "Criar produto"}
+            </button>
+          </form>
+        </div>
+      ) : null}
     </section>
   );
 }

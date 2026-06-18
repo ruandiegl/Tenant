@@ -1,14 +1,30 @@
 import { Clock, MapPin, Phone } from "lucide-react";
-import { Order } from "../../types/database";
+import { Order, OrderStatus } from "../../types/database";
 import { formatCurrency, formatTime, minutesUntil } from "../../utils/format";
 import { StatusBadge } from "../ui/status-badge";
 
 type OrderCardProps = {
   order: Order;
   compact?: boolean;
+  onStatusChange?: (orderId: string, status: OrderStatus) => void;
+  isUpdating?: boolean;
 };
 
-export function OrderCard({ order, compact = false }: OrderCardProps) {
+const nextStatusByCurrent: Partial<Record<OrderStatus, Array<{ label: string; status: OrderStatus }>>> = {
+  PLACED: [
+    { label: "Aceitar", status: "ACCEPTED" },
+    { label: "Rejeitar", status: "REJECTED" }
+  ],
+  ACCEPTED: [{ label: "Preparar", status: "PREPARING" }],
+  PREPARING: [{ label: "Pronto", status: "READY" }],
+  READY: [{ label: "Despachar", status: "DISPATCHED" }],
+  DISPATCHED: [{ label: "Entregar", status: "DELIVERED" }],
+  DELIVERED: [{ label: "Concluir", status: "COMPLETED" }]
+};
+
+export function OrderCard({ order, compact = false, onStatusChange, isUpdating = false }: OrderCardProps) {
+  const nextStatuses = nextStatusByCurrent[order.status] ?? [];
+
   return (
     <article className="order-card">
       <div className="order-card-header">
@@ -49,6 +65,16 @@ export function OrderCard({ order, compact = false }: OrderCardProps) {
         <span>Criado {formatTime(order.createdAt)}</span>
         <strong>{formatCurrency(order.total)}</strong>
       </footer>
+
+      {onStatusChange && nextStatuses.length > 0 ? (
+        <div className="order-status-actions">
+          {nextStatuses.map((action) => (
+            <button disabled={isUpdating} key={action.status} onClick={() => onStatusChange(order.id, action.status)}>
+              {isUpdating ? "Atualizando..." : action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }

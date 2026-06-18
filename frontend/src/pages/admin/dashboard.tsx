@@ -4,11 +4,11 @@ import { ClipboardList, Settings2 } from "lucide-react";
 import { PageHeader } from "../../components/ui/page-header";
 import { StatCard } from "../../components/ui/stat-card";
 import { StatusBadge } from "../../components/ui/status-badge";
-import { mockApi } from "../../services/mock-api";
+import { adminService } from "../../services/admin";
 import { formatCurrency } from "../../utils/format";
 
 export function AdminDashboard() {
-  const { data: summary } = useQuery({ queryKey: ["admin-summary"], queryFn: mockApi.getAdminSummary });
+  const { data: summary } = useQuery({ queryKey: ["admin-summary"], queryFn: adminService.getSummary });
 
   if (!summary) {
     return null;
@@ -21,7 +21,7 @@ export function AdminDashboard() {
       <PageHeader
         eyebrow="Admin"
         title="Painel operacional"
-        description="Indicadores mockados por tenant e filial para validar o desenho de relatorios."
+        description="Indicadores carregados da API podePedir por tenant."
         actions={
           <Link className="pill-button" to="/admin/config">
             <Settings2 size={17} /> Tenant

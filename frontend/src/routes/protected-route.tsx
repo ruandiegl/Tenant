@@ -8,10 +8,18 @@ type ProtectedRouteProps = {
 };
 
 export function ProtectedRoute({ permission, children }: ProtectedRouteProps) {
-  const { can } = useAuth();
+  const { can, isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <section className="screen"><div className="panel">Carregando acesso...</div></section>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (!can(permission)) {
-    return <Navigate to="/cliente" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return children;

@@ -1,5 +1,6 @@
-import { Navigate, NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { BarChart3, ChefHat, Menu as MenuIcon, Settings, ShoppingBag } from "lucide-react";
+import { Navigate, NavLink, Route, BrowserRouter as Router, Routes, useLocation } from "react-router-dom";
+import { ChefHat, Menu as MenuIcon, ShoppingBag, UserRound } from "lucide-react";
+import { AdminLayout } from "../app/layouts/admin-layout";
 import { ProtectedRoute } from "./protected-route";
 import { AdminDashboard } from "../pages/admin/dashboard";
 import { AdminOrders } from "../pages/admin/orders";
@@ -8,77 +9,115 @@ import { AdminSettings } from "../pages/admin/settings";
 import { KitchenQueue } from "../pages/kitchen/queue";
 import { CustomerMenu } from "../pages/customer/menu";
 import { CustomerCart } from "../pages/customer/cart";
-import { OrderTracking } from "../pages/customer/order-tracking";
+import { CustomerProfile } from "../pages/customer/profile";
+import { LoginPage } from "../pages/auth/login";
 
-const navItems = [
-  { to: "/cliente", label: "Cliente", icon: ShoppingBag },
-  { to: "/cozinha", label: "Cozinha", icon: ChefHat },
-  { to: "/admin", label: "Admin", icon: BarChart3 },
-  { to: "/admin/cardapio", label: "Menu", icon: MenuIcon },
-  { to: "/admin/config", label: "Config", icon: Settings }
+const customerNavItems = [
+  { to: "/cliente/menu", label: "Menu", icon: MenuIcon },
+  { to: "/cliente/carrinho", label: "Carrinho", icon: ShoppingBag },
+  { to: "/cliente/perfil", label: "Perfil", icon: UserRound }
+];
+
+const staffNavItems = [
+  { to: "/cozinha", label: "Cozinha", icon: ChefHat }
 ];
 
 export function AppRoutes() {
   return (
     <Router>
-      <div className="app-shell">
-        <main className="app-main">
-          <Routes>
-            <Route path="/" element={<Navigate to="/cliente" replace />} />
-            <Route path="/cliente" element={<CustomerMenu />} />
-            <Route path="/cliente/carrinho" element={<CustomerCart />} />
-            <Route path="/cliente/pedido/:publicCode" element={<OrderTracking />} />
-            <Route
-              path="/cozinha"
-              element={
-                <ProtectedRoute permission="kitchen.orders.manage">
-                  <KitchenQueue />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute permission="reports.read">
+      <RouteShell />
+    </Router>
+  );
+}
+
+function RouteShell() {
+  const location = useLocation();
+  const isAuthRoute = location.pathname === "/login";
+  const isCustomerRoute = location.pathname.startsWith("/cliente");
+  const isAdminRoute = location.pathname.startsWith("/admin");
+  const navItems = isCustomerRoute ? customerNavItems : staffNavItems;
+
+  return (
+    <div className={`app-shell ${isAdminRoute ? "admin-shell-active" : ""}`}>
+      <main className={`app-main ${isAdminRoute ? "admin-main" : ""}`}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/cliente/menu" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/cliente" element={<Navigate to="/cliente/menu" replace />} />
+          <Route path="/cliente/menu" element={<CustomerMenu />} />
+          <Route path="/cliente/carrinho" element={<CustomerCart />} />
+          <Route path="/cliente/perfil" element={<CustomerProfile />} />
+          <Route path="/cliente/pedido/:publicCode" element={<Navigate to="/cliente/carrinho" replace />} />
+          <Route
+            path="/cozinha"
+            element={
+              <ProtectedRoute permission="tenant.kitchen.read">
+                <KitchenQueue />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute permission="tenant.reports.read">
+                <AdminLayout>
                   <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/pedidos"
-              element={
-                <ProtectedRoute permission="orders.manage">
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/pedidos"
+            element={
+              <ProtectedRoute permission="tenant.orders.read">
+                <AdminLayout>
                   <AdminOrders />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/cardapio"
-              element={
-                <ProtectedRoute permission="menu.manage">
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/cardapio"
+            element={
+              <ProtectedRoute permission="tenant.menu.read">
+                <AdminLayout>
                   <AdminMenu />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/config"
-              element={
-                <ProtectedRoute permission="settings.manage">
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/cozinha"
+            element={
+              <ProtectedRoute permission="tenant.kitchen.read">
+                <AdminLayout>
+                  <KitchenQueue />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/config"
+            element={
+              <ProtectedRoute permission="tenant.branches.read">
+                <AdminLayout>
                   <AdminSettings />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </main>
-        <nav className="bottom-nav" aria-label="Navegacao principal">
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </main>
+      {!isAuthRoute && !isAdminRoute && (
+        <nav className={`bottom-nav ${isCustomerRoute ? "customer-nav" : "staff-nav"}`} aria-label="Navegacao principal">
           {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.to === "/admin"}>
+            <NavLink key={item.to} to={item.to} end>
               <item.icon size={18} aria-hidden="true" />
               <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
-      </div>
-    </Router>
+      )}
+    </div>
   );
 }

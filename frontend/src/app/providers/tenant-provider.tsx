@@ -1,5 +1,7 @@
 import { createContext, PropsWithChildren, useContext } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { mockTenantBundle } from "../../data/mock";
+import { tenantsService } from "../../services/tenants";
 import { Tenant, TenantSettings } from "../../types/database";
 
 type TenantContextValue = {
@@ -10,7 +12,13 @@ type TenantContextValue = {
 const TenantContext = createContext<TenantContextValue | null>(null);
 
 export function TenantProvider({ children }: PropsWithChildren) {
-  return <TenantContext.Provider value={mockTenantBundle}>{children}</TenantContext.Provider>;
+  const { data = mockTenantBundle } = useQuery({
+    queryKey: ["tenant", "current"],
+    queryFn: tenantsService.getCurrentTenant,
+    retry: 1
+  });
+
+  return <TenantContext.Provider value={data}>{children}</TenantContext.Provider>;
 }
 
 export function useTenant() {

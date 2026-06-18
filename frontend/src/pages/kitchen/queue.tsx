@@ -4,12 +4,12 @@ import { useSocket } from "../../app/providers/socket-provider";
 import { OrderCard } from "../../components/orders/order-card";
 import { PageHeader } from "../../components/ui/page-header";
 import { StatusBadge } from "../../components/ui/status-badge";
-import { mockApi } from "../../services/mock-api";
+import { kitchenService } from "../../services/kitchen";
 import { formatTime } from "../../utils/format";
 
 export function KitchenQueue() {
   const socket = useSocket();
-  const { data: queue } = useQuery({ queryKey: ["kitchen-queue"], queryFn: mockApi.getKitchenQueue });
+  const { data: queue } = useQuery({ queryKey: ["kitchen-queue"], queryFn: kitchenService.getQueue });
 
   return (
     <section className="screen">

@@ -1,0 +1,12 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">podePedir icon</title>
+  <desc id="desc">Icone verde com cloche branca da marca podePedir.</desc>
+  <rect width="96" height="96" rx="24" fill="#1A6B3B"/>
+  <path d="M25 67H71" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+  <path d="M29 66C34.8 51.8 48 40 60.5 36.8C68.8 42.1 74.7 52.7 78.5 66H29Z" fill="#FFFFFF"/>
+  <path d="M57.5 36.6C57.5 43 52.9 46.6 46.8 45C47.5 39.8 51.2 35.9 57.5 36.6Z" fill="#FFFFFF"/>
+  <path d="M29 66H79" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  <path d="M33 27C29 19.7 32.7 15.4 35.4 11.8" stroke="#2B8B52" stroke-width="4" stroke-linecap="round"/>
+  <path d="M46 24.5C42 17.2 45.7 12.9 48.4 9.3" stroke="#2B8B52" stroke-width="4" stroke-linecap="round"/>
+  <path d="M59 27C55 19.7 58.7 15.4 61.4 11.8" stroke="#2B8B52" stroke-width="4" stroke-linecap="round"/>
+</svg>

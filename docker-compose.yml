@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: Conquistas@07
       POSTGRES_DB: podepedir
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PropsWithChildren, useMemo } from "react";
 import { AuthProvider } from "./auth-provider";
+import { CatalogProvider } from "./catalog-provider";
+import { CustomerFlowProvider } from "./customer-flow-provider";
 import { SocketProvider } from "./socket-provider";
 import { TenantProvider } from "./tenant-provider";
 
@@ -21,7 +23,11 @@ export function AppProviders({ children }: PropsWithChildren) {
     <QueryClientProvider client={queryClient}>
       <TenantProvider>
         <AuthProvider>
-          <SocketProvider>{children}</SocketProvider>
+          <CatalogProvider>
+            <CustomerFlowProvider>
+              <SocketProvider>{children}</SocketProvider>
+            </CustomerFlowProvider>
+          </CatalogProvider>
         </AuthProvider>
       </TenantProvider>
     </QueryClientProvider>
