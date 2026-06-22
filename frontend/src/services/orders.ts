@@ -9,6 +9,8 @@ type BackendOrder = Omit<Order, "history" | "items" | "source"> & {
   histories?: Order["history"];
   history?: Order["history"];
   items: Order["items"];
+  deliveryAddress?: Order["deliveryAddress"];
+  payments?: unknown[];
 };
 
 type PublicTenantResponse = {
@@ -70,6 +72,7 @@ function mapOrder(order: BackendOrder): Order {
 
 export const ordersService = {
   list: async () => (await protectedApi<BackendOrder[]>("/tenant/orders")).map(mapOrder),
+  get: async (orderId: string) => mapOrder(await protectedApi<BackendOrder>(`/tenant/orders/${orderId}`)),
   getByPublicCode: async (publicCode: string) => mapOrder(await api<BackendOrder>(`/public/${TENANT_SLUG}/orders/${publicCode}`)),
   createPublicOrder: async (payload: PublicOrderPayload) => {
     const branchId = DEMO_BRANCH_ID ?? (await getDefaultPublicBranchId());

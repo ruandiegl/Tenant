@@ -212,6 +212,7 @@ export type Order = BaseEntity & {
   customerName: string;
   customerPhone: string;
   deliveryAddressId?: string;
+  deliveryAddress?: Address;
   notes?: string;
   estimatedReadyAt: string;
   acceptedAt?: string;

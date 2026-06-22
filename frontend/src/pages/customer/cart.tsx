@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bike, CreditCard, Minus, Plus, ReceiptText, Trash2, UserRound, WalletCards } from "lucide-react";
+import { toast } from "react-toastify";
 import { useCustomerFlow } from "../../app/providers/customer-flow-provider";
 import { PageHeader } from "../../components/ui/page-header";
 import { StatusBadge } from "../../components/ui/status-badge";
@@ -46,6 +47,7 @@ export function CustomerCart() {
     if (step === "cart") {
       if (items.length === 0) {
         setError("Adicione pelo menos um item ao carrinho.");
+        toast.info("Adicione pelo menos um item ao carrinho.");
         return;
       }
 
@@ -56,6 +58,7 @@ export function CustomerCart() {
     if (step === "address") {
       if (missingAddress) {
         setError("Preencha rua, numero, bairro e CEP para continuar.");
+        toast.warning("Preencha rua, numero, bairro e CEP para continuar.");
         return;
       }
 
@@ -70,29 +73,34 @@ export function CustomerCart() {
 
     if (!profile.name || profile.name.trim().length < 2) {
       setError("Informe o nome para contato antes de confirmar.");
+      toast.warning("Informe o nome para contato antes de confirmar.");
       setStep("address");
       return;
     }
 
     if (missingAddress) {
       setError("Preencha rua, numero, bairro e CEP para salvar o pedido.");
+      toast.warning("Preencha rua, numero, bairro e CEP para salvar o pedido.");
       setStep("address");
       return;
     }
 
     if (payment.type === "CREDIT_CARD" && (!payment.cardName || !payment.cardNumber || !payment.cardExpiry || !payment.cardCvv)) {
       setError("Preencha os dados do cartao.");
+      toast.warning("Preencha os dados do cartao.");
       return;
     }
 
     setIsSubmittingOrder(true);
 
     try {
-      await placeOrder();
+      const created = await placeOrder();
+      toast.success(`Pedido #${created.publicCode} confirmado.`);
       setStep("done");
     } catch (orderError) {
       console.error(orderError);
       setError("Nao foi possivel salvar o pedido no backend. Confira se a API esta rodando e se os produtos existem no banco.");
+      toast.error("Nao foi possivel salvar o pedido.");
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -102,6 +110,7 @@ export function CustomerCart() {
     resetOrder();
     setStep("cart");
     setError(null);
+    toast.info("Carrinho liberado para um novo pedido.");
   };
 
   return (
@@ -340,6 +349,9 @@ export function CustomerCart() {
             <button className="primary-button" onClick={handleNewOrder}>
               Fazer outro pedido
             </button>
+            <Link className="wide-link" to="/cliente/pedido">
+              Acompanhar pedido
+            </Link>
           </article>
 
           <article className="panel">

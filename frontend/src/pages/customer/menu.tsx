@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ShoppingCart } from "lucide-react";
+import { toast } from "react-toastify";
 import { useCatalog } from "../../app/providers/catalog-provider";
 import { useCustomerFlow } from "../../app/providers/customer-flow-provider";
 import { useTenant } from "../../app/providers/tenant-provider";
@@ -13,6 +14,19 @@ export function CustomerMenu() {
 
   const featured = publicProducts.filter((product) => product.isFeatured);
   const cartQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const categoriesWithProducts = publicCategories.map((category) => ({
+    ...category,
+    products: publicProducts.filter((product) => product.categoryId === category.id)
+  }));
+
+  const scrollToCategory = (categoryId: string) => {
+    document.getElementById(`customer-category-${categoryId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleAddProduct = (product: (typeof publicProducts)[number]) => {
+    addProduct(product);
+    toast.success(`${product.name} adicionado ao carrinho.`);
+  };
 
   return (
     <section className="screen customer-screen">
@@ -36,8 +50,10 @@ export function CustomerMenu() {
       />
 
       <div className="category-strip" aria-label="Categorias">
-        {publicCategories.map((category) => (
-          <button key={category.id}>{category.name}</button>
+        {categoriesWithProducts.map((category) => (
+          <button key={category.id} onClick={() => scrollToCategory(category.id)}>
+            {category.name}
+          </button>
         ))}
       </div>
       {error ? <p className="form-error">{error}</p> : null}
@@ -47,16 +63,26 @@ export function CustomerMenu() {
         <h2>Destaques</h2>
         <div className="product-grid">
           {featured.map((product) => (
-            <ProductCard key={product.id} product={product} stockQuantity={getProductStock(product.id)} onAdd={addProduct} />
+            <ProductCard key={product.id} product={product} stockQuantity={getProductStock(product.id)} onAdd={handleAddProduct} />
           ))}
         </div>
       </section>
 
       <section className="section-block">
         <h2>Cardapio completo</h2>
-        <div className="product-grid">
-          {publicProducts.map((product) => (
-            <ProductCard key={product.id} product={product} stockQuantity={getProductStock(product.id)} onAdd={addProduct} />
+        <div className="category-product-sections">
+          {categoriesWithProducts.map((category) => (
+            <section className="category-product-section" id={`customer-category-${category.id}`} key={category.id}>
+              <div className="category-section-header">
+                <h3>{category.name}</h3>
+                {category.description ? <span>{category.description}</span> : null}
+              </div>
+              <div className="product-grid">
+                {category.products.map((product) => (
+                  <ProductCard key={product.id} product={product} stockQuantity={getProductStock(product.id)} onAdd={handleAddProduct} />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
         {!loading && publicProducts.length === 0 ? <p className="muted-text">Nenhum produto ativo no cardapio.</p> : null}

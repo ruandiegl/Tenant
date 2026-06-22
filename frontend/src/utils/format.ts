@@ -17,6 +17,6 @@ export function formatTime(value?: string) {
 }
 
 export function minutesUntil(value: string) {
-  const diff = new Date(value).getTime() - new Date("2026-06-18T12:20:00-03:00").getTime();
+  const diff = new Date(value).getTime() - Date.now();
   return Math.max(0, Math.round(diff / 60000));
 }

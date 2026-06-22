@@ -51,7 +51,7 @@ export const publicOrderLookupSchema = z.object({
 export const orderStatusSchema = z.object({
   params: z.object({ id: z.string().min(1) }),
   body: z.object({
-    status: z.enum(["ACCEPTED", "REJECTED", "PREPARING", "READY", "DISPATCHED", "DELIVERED", "COMPLETED", "CANCELLED"]),
+    status: z.enum(["PLACED", "ACCEPTED", "REJECTED", "PREPARING", "READY", "DISPATCHED", "DELIVERED", "COMPLETED", "CANCELLED"]),
     reason: z.string().optional()
   })
 });

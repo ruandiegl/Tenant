@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PropsWithChildren, useMemo } from "react";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./auth-provider";
 import { CatalogProvider } from "./catalog-provider";
 import { CustomerFlowProvider } from "./customer-flow-provider";
@@ -30,6 +32,14 @@ export function AppProviders({ children }: PropsWithChildren) {
           </CatalogProvider>
         </AuthProvider>
       </TenantProvider>
+      <ToastContainer
+        autoClose={3200}
+        closeOnClick
+        newestOnTop={false}
+        pauseOnFocusLoss={false}
+        position="bottom-right"
+        theme="colored"
+      />
     </QueryClientProvider>
   );
 }

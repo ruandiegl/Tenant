@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Edit3, PackageCheck, Plus, Save, Trash2, X } from "lucide-react";
+import { toast } from "react-toastify";
 import { CategoryDraft, ProductDraft, useCatalog } from "../../app/providers/catalog-provider";
 import { ProductCard } from "../../components/menu/product-card";
 import { PageHeader } from "../../components/ui/page-header";
@@ -92,10 +93,18 @@ export function AdminMenu() {
   const [complementInput, setComplementInput] = useState({ name: "", price: "" });
   const [actionError, setActionError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const categoriesWithProducts = categories.map((category) => ({
+    ...category,
+    products: products.filter((product) => product.categoryId === category.id)
+  }));
 
   useEffect(() => {
     void refreshAdminCatalog();
   }, [refreshAdminCatalog]);
+
+  const scrollToCategory = (categoryId: string) => {
+    document.getElementById(`admin-category-${categoryId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const openCreateCategory = () => {
     setCategoryDraft(emptyCategoryDraft);
@@ -143,6 +152,7 @@ export function AdminMenu() {
     event.preventDefault();
     if (categoryDraft.name.trim().length < 2) {
       setActionError("Informe um nome de categoria com pelo menos 2 caracteres.");
+      toast.warning("Informe um nome de categoria com pelo menos 2 caracteres.");
       return;
     }
 
@@ -156,9 +166,12 @@ export function AdminMenu() {
         await createCategory(categoryDraft);
       }
 
+      toast.success(editingCategoryId ? "Categoria atualizada." : "Categoria criada.");
       closeCategoryModal();
     } catch (error) {
-      setActionError(errorMessage(error, "Nao foi possivel salvar a categoria."));
+      const message = errorMessage(error, "Nao foi possivel salvar a categoria.");
+      setActionError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -168,6 +181,7 @@ export function AdminMenu() {
     event.preventDefault();
     if (productDraft.name.trim().length < 2 || !productDraft.categoryId) {
       setActionError("Informe nome do produto e categoria antes de salvar.");
+      toast.warning("Informe nome do produto e categoria antes de salvar.");
       return;
     }
 
@@ -181,9 +195,12 @@ export function AdminMenu() {
         await createProduct(productDraft);
       }
 
+      toast.success(editingProductId ? "Produto atualizado." : "Produto criado.");
       closeProductModal();
     } catch (error) {
-      setActionError(errorMessage(error, "Nao foi possivel salvar o produto."));
+      const message = errorMessage(error, "Nao foi possivel salvar o produto.");
+      setActionError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -194,8 +211,11 @@ export function AdminMenu() {
 
     try {
       await deleteCategory(categoryId);
+      toast.success("Categoria excluida.");
     } catch (error) {
-      setActionError(errorMessage(error, "Nao foi possivel excluir a categoria."));
+      const message = errorMessage(error, "Nao foi possivel excluir a categoria.");
+      setActionError(message);
+      toast.error(message);
     }
   };
 
@@ -204,8 +224,11 @@ export function AdminMenu() {
 
     try {
       await deleteProduct(productId);
+      toast.success("Produto excluido.");
     } catch (error) {
-      setActionError(errorMessage(error, "Nao foi possivel excluir o produto."));
+      const message = errorMessage(error, "Nao foi possivel excluir o produto.");
+      setActionError(message);
+      toast.error(message);
     }
   };
 
@@ -315,45 +338,67 @@ export function AdminMenu() {
           </button>
         </div>
 
-        <div className="catalog-product-list">
-          {products.map((product) => {
-            const category = categories.find((item) => item.id === product.categoryId);
-            const complements = product.optionGroups.find((group) => group.name === "Complementos")?.items ?? [];
-            const ingredients = product.optionGroups.find((group) => group.name === "Ingredientes")?.items ?? [];
+        <div className="category-strip admin-category-filter" aria-label="Filtrar produtos por categoria">
+          {categoriesWithProducts.map((category) => (
+            <button key={category.id} onClick={() => scrollToCategory(category.id)}>
+              {category.name}
+            </button>
+          ))}
+        </div>
 
-            return (
-              <article className="catalog-product-row" key={product.id}>
-                <ProductCard product={product} stockQuantity={getProductStock(product.id)} />
-                <div className="catalog-product-details">
-                  <div>
-                    <span className="eyebrow">{category?.name ?? "Sem categoria"}</span>
-                    <h3>{product.name}</h3>
-                    <p>{product.description}</p>
-                  </div>
-                  <div className="catalog-meta-grid">
-                    <span>Base {formatCurrency(product.basePrice)}</span>
-                    <span>Custo {formatCurrency(product.costPrice ?? 0)}</span>
-                    <span>Estoque {getProductStock(product.id)}</span>
-                    <StatusBadge status={product.status} />
-                  </div>
-                  <p className="muted-text">
-                    Ingredientes: {ingredients.map((item) => item.name).join(", ") || "nao informado"}
-                  </p>
-                  <p className="muted-text">
-                    Complementos: {complements.map((item) => `${item.name} (${formatCurrency(item.price)})`).join(", ") || "sem complementos"}
-                  </p>
-                  <div className="row-actions wide">
-                    <button onClick={() => openEditProduct(product)}>
-                      <Edit3 size={16} /> Editar
-                    </button>
-                    <button onClick={() => void handleDeleteProduct(product.id)}>
-                      <Trash2 size={16} /> Excluir
-                    </button>
-                  </div>
+        <div className="category-product-sections">
+          {categoriesWithProducts.map((category) => (
+            <section className="category-product-section" id={`admin-category-${category.id}`} key={category.id}>
+              <div className="category-section-header">
+                <div>
+                  <h3>{category.name}</h3>
+                  {category.description ? <span>{category.description}</span> : null}
                 </div>
-              </article>
-            );
-          })}
+                <StatusBadge status={category.status} />
+              </div>
+
+              <div className="catalog-product-list">
+                {category.products.map((product) => {
+                  const complements = product.optionGroups.find((group) => group.name === "Complementos")?.items ?? [];
+                  const ingredients = product.optionGroups.find((group) => group.name === "Ingredientes")?.items ?? [];
+
+                  return (
+                    <article className="catalog-product-row" key={product.id}>
+                      <ProductCard product={product} stockQuantity={getProductStock(product.id)} />
+                      <div className="catalog-product-details">
+                        <div>
+                          <span className="eyebrow">{category.name}</span>
+                          <h3>{product.name}</h3>
+                          <p>{product.description}</p>
+                        </div>
+                        <div className="catalog-meta-grid">
+                          <span>Base {formatCurrency(product.basePrice)}</span>
+                          <span>Custo {formatCurrency(product.costPrice ?? 0)}</span>
+                          <span>Estoque {getProductStock(product.id)}</span>
+                          <StatusBadge status={product.status} />
+                        </div>
+                        <p className="muted-text">
+                          Ingredientes: {ingredients.map((item) => item.name).join(", ") || "nao informado"}
+                        </p>
+                        <p className="muted-text">
+                          Complementos: {complements.map((item) => `${item.name} (${formatCurrency(item.price)})`).join(", ") || "sem complementos"}
+                        </p>
+                        <div className="row-actions wide">
+                          <button onClick={() => openEditProduct(product)}>
+                            <Edit3 size={16} /> Editar
+                          </button>
+                          <button onClick={() => void handleDeleteProduct(product.id)}>
+                            <Trash2 size={16} /> Excluir
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+                {category.products.length === 0 ? <p className="muted-text">Nenhum produto cadastrado nesta categoria.</p> : null}
+              </div>
+            </section>
+          ))}
         </div>
       </section>
 
