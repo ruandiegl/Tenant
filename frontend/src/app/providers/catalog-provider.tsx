@@ -1,6 +1,7 @@
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { menuService } from "../../services/menu";
 import { MenuCategory, Product, ProductAvailability, ProductStatus } from "../../types/database";
+import { ImageUpload } from "../../utils/image-upload";
 
 export type CategoryDraft = {
   name: string;
@@ -15,11 +16,7 @@ export type ProductDraft = {
   description: string;
   sku: string;
   imageUrl: string;
-  imageUpload?: {
-    fileName: string;
-    mimeType: "image/jpeg" | "image/png" | "image/webp";
-    dataBase64: string;
-  };
+  imageUpload?: ImageUpload;
   basePrice: number;
   promotionalPrice?: number;
   costPrice?: number;

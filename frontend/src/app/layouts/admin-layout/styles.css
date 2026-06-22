@@ -1,0 +1,160 @@
+.admin-layout {
+  background: var(--bg);
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.admin-sidebar {
+  background: var(--brand-dark);
+  color: white;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  min-height: 100vh;
+  padding: 18px 16px;
+  position: sticky;
+  top: 0;
+}
+
+.admin-brand {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 46px minmax(0, 1fr);
+  min-height: 54px;
+}
+
+.admin-brand .brand-logo {
+  border-radius: 8px;
+  height: 44px;
+  width: 44px;
+}
+
+.admin-brand strong,
+.admin-user-card strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.admin-brand span,
+.admin-user-card span,
+.admin-tenant-chip {
+  color: #aebbd0;
+  font-size: 0.8rem;
+}
+
+.admin-sidebar-nav {
+  align-content: start;
+  display: grid;
+  gap: 8px;
+  padding: 28px 0;
+}
+
+.admin-sidebar-nav a {
+  align-items: center;
+  border-radius: 8px;
+  color: #eef5f2;
+  display: grid;
+  font-weight: 850;
+  gap: 12px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  min-height: 48px;
+  padding: 0 12px 0 8px;
+}
+
+.admin-sidebar-nav a.active {
+  background: var(--brand);
+  box-shadow: 0 12px 30px rgba(23, 107, 91, 0.22);
+}
+
+.admin-nav-icon {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.admin-sidebar-footer {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-user-card {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 42px minmax(0, 1fr) 34px;
+  padding: 10px;
+}
+
+.admin-avatar {
+  align-items: center;
+  background: var(--accent);
+  border-radius: 50%;
+  color: white;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.admin-user-card div {
+  min-width: 0;
+}
+
+.admin-user-card strong,
+.admin-user-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-card button {
+  align-items: center;
+  background: transparent;
+  color: #aebbd0;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.admin-tenant-chip {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+@media (max-width: 900px) {
+  .admin-layout {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  .admin-sidebar {
+    padding: 14px 10px;
+  }
+
+  .admin-brand,
+  .admin-sidebar-nav a,
+  .admin-user-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding-inline: 0;
+  }
+
+  .admin-brand div,
+  .admin-sidebar-nav span:not(.admin-nav-icon),
+  .admin-user-card div,
+  .admin-user-card button,
+  .admin-tenant-chip {
+    display: none;
+  }
+}

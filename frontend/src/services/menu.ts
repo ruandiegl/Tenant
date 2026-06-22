@@ -1,4 +1,5 @@
 import { MenuCategory, Product, ProductAvailability, ProductTemplate } from "../types/database";
+import { ImageUpload } from "../utils/image-upload";
 import { api, getApiBaseUrl, protectedApi } from "./api";
 
 const TENANT_SLUG = import.meta.env.VITE_DEMO_TENANT_SLUG ?? "demo-burger";
@@ -30,11 +31,7 @@ type ProductPayload = {
   description?: string;
   sku?: string;
   imageUrl?: string;
-  imageUpload?: {
-    fileName: string;
-    mimeType: "image/jpeg" | "image/png" | "image/webp";
-    dataBase64: string;
-  };
+  imageUpload?: ImageUpload;
   basePrice: number;
   promotionalPrice?: number;
   costPrice?: number;

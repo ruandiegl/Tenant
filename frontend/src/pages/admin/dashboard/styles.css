@@ -1,0 +1,58 @@
+.stats-grid,
+.admin-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.status-list {
+  display: grid;
+  gap: 10px;
+}
+
+.status-list div,
+.rank-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+  padding-top: 10px;
+}
+
+.status-list div:first-of-type,
+.rank-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.rank-row div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rank-row strong,
+.rank-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-row span {
+  color: var(--muted);
+}
+
+@media (min-width: 720px) {
+  .stats-grid,
+  .admin-grid {
+    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1040px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

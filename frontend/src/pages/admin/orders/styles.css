@@ -1,0 +1,38 @@
+.filter-row {
+  display: flex;
+  gap: 8px;
+  margin-inline: -14px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 0 14px 8px;
+  scroll-padding-inline: 14px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-row button {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  flex: 0 0 auto;
+  font-weight: 800;
+  min-width: max-content;
+  padding: 10px 14px;
+  scroll-snap-align: start;
+}
+
+.filter-row button.active {
+  background: var(--brand-dark);
+  border-color: var(--brand-dark);
+  color: white;
+}
+
+.list-stack {
+  display: grid;
+  gap: 12px;
+}

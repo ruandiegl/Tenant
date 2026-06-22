@@ -1,0 +1,37 @@
+.status-badge {
+  align-items: center;
+  background: #edf2ef;
+  border-radius: 999px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 850;
+  min-height: 28px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.status-paid,
+.status-active,
+.status-ready,
+.status-completed,
+.status-started {
+  background: #e6f5ec;
+  color: var(--success);
+}
+
+.status-placed,
+.status-pending,
+.status-preparing,
+.status-queued {
+  background: #fff4df;
+  color: var(--warning);
+}
+
+.status-cancelled,
+.status-failed,
+.status-out_of_stock,
+.status-delayed {
+  background: #ffe8e5;
+  color: var(--danger);
+}

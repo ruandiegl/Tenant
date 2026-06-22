@@ -1,0 +1,253 @@
+.connection,
+.ticket-meta {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.ticket-meta {
+  justify-content: space-between;
+}
+
+.item-list {
+  display: grid;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item-list li {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.item-list span {
+  color: var(--muted);
+}
+
+.kitchen-board {
+  display: grid;
+  gap: 12px;
+}
+
+.kitchen-column {
+  align-content: start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.kitchen-column > header {
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-bottom: 10px;
+}
+
+.kitchen-column h2 {
+  font-size: 1rem;
+  margin: 0 0 4px;
+}
+
+.kitchen-column header span,
+.kitchen-order-summary small {
+  color: var(--muted);
+}
+
+.kitchen-column header strong {
+  align-items: center;
+  background: var(--surface-strong);
+  border-radius: 999px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  font-size: 0.8rem;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 30px;
+}
+
+.kitchen-column-list {
+  display: grid;
+  gap: 10px;
+}
+
+.kitchen-order-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  overflow: hidden;
+}
+
+.kitchen-order-summary {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  padding: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.kitchen-order-summary div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.kitchen-order-summary strong,
+.kitchen-order-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kitchen-order-details {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.kitchen-card-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.kitchen-card-actions button {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 0;
+  border-radius: 8px;
+  color: var(--brand-dark);
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 850;
+  gap: 7px;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.kitchen-card-actions .primary-button {
+  background: var(--brand);
+  color: white;
+  width: 100%;
+}
+
+.kitchen-card-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.order-details-modal {
+  max-height: min(86vh, 860px);
+  max-width: 760px;
+  overflow: auto;
+}
+
+.order-details-content {
+  display: grid;
+  gap: 16px;
+}
+
+.order-details-content section {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.order-details-content section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.order-details-content h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.order-detail-title,
+.order-detail-item > div,
+.order-totals-grid {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.order-detail-items {
+  display: grid;
+  gap: 10px;
+}
+
+.order-detail-item {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.order-detail-item ul {
+  color: var(--muted);
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.order-totals-grid {
+  align-items: stretch;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.status-list {
+  display: grid;
+  gap: 10px;
+}
+
+.status-list div {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+  padding-top: 10px;
+}
+
+.status-list div:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+@media (min-width: 720px) {
+  .kitchen-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1040px) {
+  .kitchen-board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

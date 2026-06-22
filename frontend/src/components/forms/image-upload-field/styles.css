@@ -1,0 +1,29 @@
+.image-upload-field {
+  display: grid;
+  gap: 10px;
+}
+
+.product-image-preview {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 74px minmax(0, 1fr);
+  padding: 10px;
+}
+
+.product-image-preview img {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  height: 74px;
+  object-fit: cover;
+  width: 74px;
+}
+
+.product-image-preview span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}

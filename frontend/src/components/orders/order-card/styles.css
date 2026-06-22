@@ -1,0 +1,96 @@
+.order-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.order-card h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.order-card-header {
+  align-items: start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.code {
+  color: var(--brand);
+  display: block;
+  font-size: 0.77rem;
+  font-weight: 850;
+}
+
+.meta-grid {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: 1fr;
+}
+
+.meta-grid span {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.item-list {
+  display: grid;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item-list li {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.item-list span {
+  color: var(--muted);
+}
+
+.order-card footer {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-top: 10px;
+}
+
+.order-card footer strong {
+  color: var(--text);
+}
+
+.order-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.order-status-actions button {
+  background: #e6f5ec;
+  border: 0;
+  border-radius: 8px;
+  color: var(--brand-dark);
+  cursor: pointer;
+  font-weight: 850;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.order-status-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}

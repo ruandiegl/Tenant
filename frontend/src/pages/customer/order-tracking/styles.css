@@ -1,0 +1,133 @@
+.tracking-summary {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tracking-summary h2 {
+  font-size: 1.45rem;
+  margin: 10px 0 4px;
+}
+
+.tracking-estimate {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 12px;
+}
+
+.tracking-estimate span {
+  color: var(--brand-dark);
+  font-size: 1.5rem;
+  font-weight: 900;
+}
+
+.tracking-estimate small {
+  color: var(--muted);
+}
+
+.tracking-steps {
+  display: grid;
+  gap: 0;
+}
+
+.tracking-steps > div {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  min-height: 66px;
+  position: relative;
+}
+
+.tracking-steps > div::before {
+  background: var(--line);
+  bottom: 0;
+  content: "";
+  left: 10px;
+  position: absolute;
+  top: 22px;
+  width: 2px;
+}
+
+.tracking-steps > div:last-child::before {
+  display: none;
+}
+
+.tracking-steps > div > span {
+  background: var(--line);
+  border-radius: 50%;
+  height: 22px;
+  width: 22px;
+  z-index: 1;
+}
+
+.tracking-steps > div.active > span,
+.tracking-steps > div.active::before {
+  background: var(--brand);
+}
+
+.tracking-steps strong {
+  display: block;
+}
+
+.tracking-steps small {
+  color: var(--muted);
+}
+
+.checkout-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.order-detail-items {
+  display: grid;
+  gap: 10px;
+}
+
+.order-detail-item {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.order-detail-item > div,
+.total-panel > div {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.order-detail-item ul {
+  color: var(--muted);
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.connection {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.grand-total {
+  border-top: 1px solid var(--line);
+  font-size: 1.1rem;
+  padding-top: 12px;
+}
+
+@media (min-width: 1040px) {
+  .tracking-summary {
+    grid-template-columns: minmax(0, 1fr) 180px;
+  }
+}
