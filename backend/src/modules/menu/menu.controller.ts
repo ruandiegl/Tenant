@@ -65,6 +65,38 @@ export const deleteProduct: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const listTemplates: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.listProductTemplates(req.tenantId!));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const createTemplate: RequestHandler = async (req, res, next) => {
+  try {
+    return res.status(201).json(await service.createProductTemplate(req.tenantId!, req.body));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateTemplate: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.updateProductTemplate(req.tenantId!, req.params.id, req.body));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const deleteTemplate: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.deleteProductTemplate(req.tenantId!, req.params.id));
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const publicMenu: RequestHandler = async (req, res, next) => {
   try {
     return res.json(await service.getPublicMenu(req.params.tenantSlug, req.query.branchId as string | undefined));

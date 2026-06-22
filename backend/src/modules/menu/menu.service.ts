@@ -40,6 +40,21 @@ type ProductInput = {
   optionGroups?: OptionGroupInput[];
 };
 
+type TemplateInput = {
+  name?: string;
+  description?: string;
+  status?: RecordStatus;
+  sortOrder?: number;
+  items?: Array<{
+    type: "INGREDIENT" | "COMPLEMENT";
+    name: string;
+    description?: string;
+    price?: number;
+    sortOrder?: number;
+    status?: RecordStatus;
+  }>;
+};
+
 const productInclude = {
   category: true,
   optionGroups: {
@@ -49,6 +64,33 @@ const productInclude = {
   availability: true,
   images: true
 };
+
+const templateInclude = {
+  items: { orderBy: [{ type: "asc" as const }, { sortOrder: "asc" as const }, { name: "asc" as const }] }
+};
+
+const defaultTemplates: Array<Required<Pick<TemplateInput, "name" | "items">> & Pick<TemplateInput, "description" | "sortOrder">> = [
+  {
+    name: "Hamburguer classico",
+    description: "Base comum para lanches artesanais.",
+    sortOrder: 1,
+    items: [
+      { type: "INGREDIENT", name: "Pao", sortOrder: 1 },
+      { type: "INGREDIENT", name: "Carne", sortOrder: 2 },
+      { type: "INGREDIENT", name: "Queijo", sortOrder: 3 },
+      { type: "INGREDIENT", name: "Molho da casa", sortOrder: 4 },
+      { type: "COMPLEMENT", name: "Bacon", price: 8, sortOrder: 1 },
+      { type: "COMPLEMENT", name: "Cheddar", price: 2.5, sortOrder: 2 },
+      { type: "COMPLEMENT", name: "Ovo frito", price: 3, sortOrder: 3 }
+    ]
+  },
+  {
+    name: "Bebida lata",
+    description: "Modelo simples para bebidas prontas.",
+    sortOrder: 2,
+    items: [{ type: "INGREDIENT", name: "Lata gelada", sortOrder: 1 }]
+  }
+];
 
 const normalizeProductStatus = (status: ProductStatus | undefined, stockQuantity: number | undefined) => {
   if (status === "ARCHIVED" || status === "INACTIVE") return status;
@@ -121,6 +163,52 @@ const createOptionGroups = (tenantId: string, groups: OptionGroupInput[]) => ({
       : undefined
   }))
 });
+
+const createTemplateItems = (tenantId: string, items: NonNullable<TemplateInput["items"]>) => ({
+  create: items.map((item, index) => ({
+    tenantId,
+    type: item.type,
+    name: item.name,
+    description: item.description,
+    price: new Prisma.Decimal(item.price ?? 0),
+    sortOrder: item.sortOrder ?? index + 1,
+    status: item.status ?? "ACTIVE"
+  }))
+});
+
+const ensureDefaultTemplates = async (tenantId: string) => {
+  const existing = await prisma.productTemplate.count({ where: { tenantId, deletedAt: null } });
+
+  if (existing > 0) return;
+
+  await prisma.productTemplate.createMany({
+    data: defaultTemplates.map((template) => ({
+      tenantId,
+      name: template.name,
+      description: template.description,
+      sortOrder: template.sortOrder ?? 0
+    }))
+  });
+
+  const created = await prisma.productTemplate.findMany({ where: { tenantId, deletedAt: null } });
+
+  for (const template of defaultTemplates) {
+    const createdTemplate = created.find((entry) => entry.name === template.name);
+    if (!createdTemplate) continue;
+
+    await prisma.productTemplateItem.createMany({
+      data: template.items.map((item, index) => ({
+        tenantId,
+        templateId: createdTemplate.id,
+        type: item.type,
+        name: item.name,
+        description: item.description,
+        price: new Prisma.Decimal(item.price ?? 0),
+        sortOrder: item.sortOrder ?? index + 1
+      }))
+    });
+  }
+};
 
 export const createCategory = async (tenantId: string, data: CategoryInput & { name: string }) => {
   await validateBranch(tenantId, data.branchId);
@@ -317,6 +405,71 @@ export const deleteProduct = async (tenantId: string, id: string) => {
     where: { id },
     data: { status: "ARCHIVED", deletedAt: new Date() },
     include: productInclude
+  });
+};
+
+export const listProductTemplates = async (tenantId: string) => {
+  await ensureDefaultTemplates(tenantId);
+
+  return prisma.productTemplate.findMany({
+    where: { tenantId, deletedAt: null },
+    include: templateInclude,
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
+  });
+};
+
+export const createProductTemplate = async (tenantId: string, data: TemplateInput & { name: string }) => {
+  return prisma.productTemplate.create({
+    data: {
+      tenantId,
+      name: data.name,
+      description: data.description,
+      status: data.status ?? "ACTIVE",
+      sortOrder: data.sortOrder ?? 0,
+      items: data.items ? createTemplateItems(tenantId, data.items) : undefined
+    },
+    include: templateInclude
+  });
+};
+
+export const updateProductTemplate = async (tenantId: string, id: string, data: TemplateInput) => {
+  const template = await prisma.productTemplate.findFirst({ where: { id, tenantId, deletedAt: null } });
+
+  if (!template) {
+    throw new AppError("Template not found", 404);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    if (data.items !== undefined) {
+      await tx.productTemplateItem.deleteMany({ where: { tenantId, templateId: id } });
+    }
+
+    await tx.productTemplate.update({
+      where: { id },
+      data: {
+        name: data.name,
+        description: data.description,
+        status: data.status,
+        sortOrder: data.sortOrder,
+        items: data.items ? createTemplateItems(tenantId, data.items) : undefined
+      }
+    });
+
+    return tx.productTemplate.findUniqueOrThrow({ where: { id }, include: templateInclude });
+  });
+};
+
+export const deleteProductTemplate = async (tenantId: string, id: string) => {
+  const template = await prisma.productTemplate.findFirst({ where: { id, tenantId, deletedAt: null } });
+
+  if (!template) {
+    throw new AppError("Template not found", 404);
+  }
+
+  return prisma.productTemplate.update({
+    where: { id },
+    data: { status: "ARCHIVED", deletedAt: new Date() },
+    include: templateInclude
   });
 };
 

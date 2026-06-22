@@ -3,6 +3,13 @@ import { useCatalog } from "./catalog-provider";
 import { ordersService } from "../../services/orders";
 import { Product } from "../../types/database";
 
+export type CustomerSelectedOption = {
+  optionItemId: string;
+  optionName: string;
+  quantity: number;
+  unitPrice: number;
+};
+
 export type CustomerCartItem = {
   id: string;
   productId: string;
@@ -10,6 +17,7 @@ export type CustomerCartItem = {
   imageUrl: string;
   quantity: number;
   unitPrice: number;
+  options: CustomerSelectedOption[];
   notes: string;
 };
 
@@ -58,7 +66,7 @@ type CustomerFlowContextValue = {
   deliveryFee: number;
   discountTotal: number;
   total: number;
-  addProduct: (product: Product) => void;
+  addProduct: (product: Product, options?: CustomerSelectedOption[], notes?: string) => void;
   incrementItem: (itemId: string) => void;
   decrementItem: (itemId: string) => void;
   removeItem: (itemId: string) => void;
@@ -99,15 +107,18 @@ const emptyProfile: CustomerProfileDraft = {
 
 const CustomerFlowContext = createContext<CustomerFlowContextValue | null>(null);
 
-function createCartItem(product: Product): CustomerCartItem {
+function createCartItem(product: Product, options: CustomerSelectedOption[] = [], notes = ""): CustomerCartItem {
+  const optionsTotal = options.reduce((sum, option) => sum + option.unitPrice * option.quantity, 0);
+
   return {
-    id: `cart_${product.id}_${Date.now()}`,
+    id: `cart_${product.id}_${Date.now()}_${options.map((option) => option.optionItemId).join("_")}`,
     productId: product.id,
     productName: product.name,
     imageUrl: product.imageUrl,
     quantity: 1,
-    unitPrice: product.promotionalPrice ?? product.basePrice,
-    notes: ""
+    unitPrice: (product.promotionalPrice ?? product.basePrice) + optionsTotal,
+    options,
+    notes
   };
 }
 
@@ -140,16 +151,22 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
       profile,
       order,
       ...totals,
-      addProduct: (product) => {
+      addProduct: (product, options = [], notes = "") => {
         setOrder(null);
         setItems((current) => {
-          const existing = current.find((item) => item.productId === product.id && item.notes === "");
+          const optionKey = options.map((option) => option.optionItemId).sort().join("|");
+          const existing = current.find(
+            (item) =>
+              item.productId === product.id &&
+              item.notes === notes &&
+              item.options.map((option) => option.optionItemId).sort().join("|") === optionKey
+          );
 
           if (existing) {
             return current.map((item) => (item.id === existing.id ? { ...item, quantity: item.quantity + 1 } : item));
           }
 
-          return [...current, createCartItem(product)];
+          return [...current, createCartItem(product, options, notes)];
         });
       },
       incrementItem: (itemId) => {
@@ -199,7 +216,10 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
             productId: item.productId,
             quantity: item.quantity,
             notes: item.notes || undefined,
-            options: []
+            options: item.options.map((option) => ({
+              optionItemId: option.optionItemId,
+              quantity: option.quantity
+            }))
           }))
         });
 

@@ -251,6 +251,7 @@ img {
 }
 
 .admin-sidebar {
+  height: 100vh;
   background: var(--brand-dark);
   color: white;
   display: grid;
@@ -1641,6 +1642,102 @@ img {
   gap: 6px;
   min-height: 32px;
   padding: 0 10px;
+}
+
+.template-card-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.template-card {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.template-card span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.template-select-field {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  min-height: 48px;
+  padding: 0 12px;
+}
+
+.template-select-field select {
+  background: transparent;
+  border: 0;
+  color: var(--brand-dark);
+  font: inherit;
+  font-weight: 850;
+  outline: 0;
+  width: 100%;
+}
+
+.complete-sandwich-box {
+  background: #e6f5ec;
+  border: 1px solid #c8ead5;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.complete-sandwich-box span {
+  color: var(--muted);
+}
+
+.product-customizer-modal {
+  max-height: min(88vh, 840px);
+  max-width: 760px;
+  overflow: auto;
+}
+
+.customizer-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.customizer-group {
+  display: grid;
+  gap: 8px;
+}
+
+.customizer-option {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 64px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.customizer-option.selected {
+  background: #e6f5ec;
+  border-color: var(--brand);
+}
+
+.customizer-option div {
+  display: grid;
+  gap: 3px;
+}
+
+.customizer-option span,
+.customizer-option small {
+  color: var(--muted);
 }
 
 @media (min-width: 720px) {

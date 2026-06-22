@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Bike, CreditCard, Minus, Plus, ReceiptText, Trash2, UserRound, WalletCards } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Bike, ChevronLeft, CreditCard, Minus, Plus, ReceiptText, Trash2, UserRound, WalletCards } from "lucide-react";
 import { toast } from "react-toastify";
 import { useCustomerFlow } from "../../app/providers/customer-flow-provider";
 import { PageHeader } from "../../components/ui/page-header";
@@ -9,7 +9,8 @@ import { formatCurrency, formatTime } from "../../utils/format";
 
 type CheckoutStep = "cart" | "address" | "payment" | "done";
 
-export function CustomerCart() {
+export function CustomerCart({ step }: { step: CheckoutStep }) {
+  const navigate = useNavigate();
   const {
     items,
     address,
@@ -30,7 +31,6 @@ export function CustomerCart() {
     placeOrder,
     resetOrder
   } = useCustomerFlow();
-  const [step, setStep] = useState<CheckoutStep>(order ? "done" : "cart");
   const [error, setError] = useState<string | null>(null);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
@@ -40,6 +40,16 @@ export function CustomerCart() {
   );
 
   const paymentLabel = payment.type === "PIX" ? "PIX" : payment.type === "CREDIT_CARD" ? "Cartao de credito" : "Dinheiro";
+  const pageTitle =
+    step === "cart" ? "Revise seu pedido" : step === "address" ? "Endereco de entrega" : step === "payment" ? "Pagamento" : "Pedido confirmado";
+  const pageDescription =
+    step === "cart"
+      ? "Confira os itens antes de continuar."
+      : step === "address"
+        ? "Informe onde deseja receber o pedido."
+        : step === "payment"
+          ? "Escolha a forma de pagamento para confirmar."
+          : "Seu pedido foi recebido pela loja.";
 
   const nextStep = () => {
     setError(null);
@@ -51,18 +61,24 @@ export function CustomerCart() {
         return;
       }
 
-      setStep("address");
+      navigate("/cliente/carrinho/endereco");
       return;
     }
 
     if (step === "address") {
+      if (items.length === 0) {
+        toast.info("Escolha pelo menos um item antes de continuar.");
+        navigate("/cliente/carrinho");
+        return;
+      }
+
       if (missingAddress) {
         setError("Preencha rua, numero, bairro e CEP para continuar.");
         toast.warning("Preencha rua, numero, bairro e CEP para continuar.");
         return;
       }
 
-      setStep("payment");
+      navigate("/cliente/carrinho/pagamento");
       return;
     }
   };
@@ -71,17 +87,23 @@ export function CustomerCart() {
     event.preventDefault();
     setError(null);
 
+    if (items.length === 0) {
+      toast.info("Escolha pelo menos um item antes de finalizar.");
+      navigate("/cliente/carrinho");
+      return;
+    }
+
     if (!profile.name || profile.name.trim().length < 2) {
       setError("Informe o nome para contato antes de confirmar.");
       toast.warning("Informe o nome para contato antes de confirmar.");
-      setStep("address");
+      navigate("/cliente/carrinho/endereco");
       return;
     }
 
     if (missingAddress) {
       setError("Preencha rua, numero, bairro e CEP para salvar o pedido.");
       toast.warning("Preencha rua, numero, bairro e CEP para salvar o pedido.");
-      setStep("address");
+      navigate("/cliente/carrinho/endereco");
       return;
     }
 
@@ -96,11 +118,11 @@ export function CustomerCart() {
     try {
       const created = await placeOrder();
       toast.success(`Pedido #${created.publicCode} confirmado.`);
-      setStep("done");
+      navigate("/cliente/carrinho/confirmacao");
     } catch (orderError) {
       console.error(orderError);
-      setError("Nao foi possivel salvar o pedido no backend. Confira se a API esta rodando e se os produtos existem no banco.");
-      toast.error("Nao foi possivel salvar o pedido.");
+      setError("Nao conseguimos confirmar seu pedido agora. Tente novamente em instantes.");
+      toast.error("Nao conseguimos confirmar seu pedido agora.");
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -108,26 +130,43 @@ export function CustomerCart() {
 
   const handleNewOrder = () => {
     resetOrder();
-    setStep("cart");
+    navigate("/cliente/carrinho");
     setError(null);
     toast.info("Carrinho liberado para um novo pedido.");
   };
 
+  const goBack = () => {
+    setError(null);
+
+    if (step === "address") {
+      navigate("/cliente/carrinho");
+      return;
+    }
+
+    if (step === "payment") {
+      navigate("/cliente/carrinho/endereco");
+      return;
+    }
+
+    if (step === "done") {
+      navigate("/cliente/pedido");
+      return;
+    }
+
+    navigate("/cliente/menu");
+  };
+
   return (
     <section className="screen">
+      <button className="checkout-back-button" onClick={goBack} type="button" aria-label="Voltar">
+        <ChevronLeft size={24} />
+      </button>
+
       <PageHeader
         eyebrow="Carrinho"
-        title={step === "done" ? "Pedido confirmado" : "Finalize como convidado"}
-        description="Fluxo publico: adicionar itens, cadastrar endereco e pagar sem obrigar criacao de conta."
+        title={pageTitle}
+        description={pageDescription}
       />
-
-      <div className="checkout-steps" aria-label="Etapas do checkout">
-        {["cart", "address", "payment", "done"].map((item) => (
-          <button className={step === item ? "active" : ""} key={item} onClick={() => item !== "done" && setStep(item as CheckoutStep)}>
-            {item === "cart" ? "Itens" : item === "address" ? "Endereco" : item === "payment" ? "Pagamento" : "Pedido"}
-          </button>
-        ))}
-      </div>
 
       {error ? <p className="form-error">{error}</p> : null}
 
@@ -151,6 +190,9 @@ export function CustomerCart() {
                   <div>
                     <strong>{item.productName}</strong>
                     <span>{formatCurrency(item.unitPrice)}</span>
+                    {item.options.length > 0 ? (
+                      <small className="muted-text">{item.options.map((option) => option.optionName).join(", ")}</small>
+                    ) : null}
                     <textarea
                       aria-label={`Observacoes para ${item.productName}`}
                       onChange={(event) => updateItemNotes(item.id, event.target.value)}
@@ -179,7 +221,18 @@ export function CustomerCart() {
         </div>
       ) : null}
 
-      {step === "address" ? (
+      {step === "address" && items.length === 0 ? (
+        <article className="panel empty-state">
+          <ReceiptText size={26} />
+          <strong>Seu carrinho esta vazio</strong>
+          <span>Escolha produtos no menu antes de informar a entrega.</span>
+          <Link className="wide-link" to="/cliente/menu">
+            Ver menu
+          </Link>
+        </article>
+      ) : null}
+
+      {step === "address" && items.length > 0 ? (
         <div className="checkout-grid">
           <article className="panel">
             <h2>Dados para entrega</h2>
@@ -255,7 +308,18 @@ export function CustomerCart() {
         </div>
       ) : null}
 
-      {step === "payment" ? (
+      {step === "payment" && items.length === 0 ? (
+        <article className="panel empty-state">
+          <ReceiptText size={26} />
+          <strong>Seu carrinho esta vazio</strong>
+          <span>Escolha produtos no menu antes de finalizar o pedido.</span>
+          <Link className="wide-link" to="/cliente/menu">
+            Ver menu
+          </Link>
+        </article>
+      ) : null}
+
+      {step === "payment" && items.length > 0 ? (
         <form className="checkout-grid" onSubmit={handlePaymentSubmit}>
           <article className="panel">
             <h2>Pagamento</h2>
@@ -330,6 +394,17 @@ export function CustomerCart() {
         </form>
       ) : null}
 
+      {step === "done" && !order ? (
+        <article className="panel empty-state">
+          <ReceiptText size={26} />
+          <strong>Nenhum pedido confirmado ainda</strong>
+          <span>Finalize um pedido para ver a confirmacao por aqui.</span>
+          <Link className="wide-link" to="/cliente/menu">
+            Ver menu
+          </Link>
+        </article>
+      ) : null}
+
       {step === "done" && order ? (
         <div className="checkout-grid">
           <article className="panel success-panel">
@@ -366,9 +441,8 @@ export function CustomerCart() {
         </div>
       ) : null}
 
-      {step !== "done" && items.length > 0 ? (
+      {step !== "done" ? (
         <div className="checkout-actions">
-          {step !== "cart" ? <button onClick={() => setStep(step === "payment" ? "address" : "cart")}>Voltar</button> : null}
           {step !== "payment" ? <button onClick={nextStep}>Continuar</button> : null}
         </div>
       ) : null}

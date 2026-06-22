@@ -49,7 +49,10 @@ function RouteShell() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/cliente" element={<Navigate to="/cliente/menu" replace />} />
           <Route path="/cliente/menu" element={<CustomerMenu />} />
-          <Route path="/cliente/carrinho" element={<CustomerCart />} />
+          <Route path="/cliente/carrinho" element={<CustomerCart step="cart" />} />
+          <Route path="/cliente/carrinho/endereco" element={<CustomerCart step="address" />} />
+          <Route path="/cliente/carrinho/pagamento" element={<CustomerCart step="payment" />} />
+          <Route path="/cliente/carrinho/confirmacao" element={<CustomerCart step="done" />} />
           <Route path="/cliente/perfil" element={<CustomerProfile />} />
           <Route path="/cliente/pedido" element={<OrderTracking publicCodeFallback={order?.publicCode} />} />
           <Route path="/cliente/pedido/:publicCode" element={<OrderTracking />} />
@@ -116,7 +119,7 @@ function RouteShell() {
       {!isAuthRoute && !isAdminRoute && (
         <nav className={`bottom-nav ${isCustomerRoute ? "customer-nav" : "staff-nav"}`} aria-label="Navegacao principal">
           {navItems.map((item) => (
-            <NavLink end={item.to !== "/cliente/pedido"} key={item.to} to={item.to}>
+            <NavLink end={item.to === "/cliente/menu" || item.to === "/cliente/perfil"} key={item.to} to={item.to}>
               <item.icon size={18} aria-hidden="true" />
               <span>{item.label}</span>
             </NavLink>

@@ -159,6 +159,7 @@ model Tenant {
   roles     Role[]
   branches  Branch[]
   customers Customer[]
+  productTemplates ProductTemplate[]
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   deletedAt DateTime?
@@ -522,6 +523,39 @@ model ProductImage {
   createdAt DateTime @default(now())
 
   @@index([tenantId, productId])
+}
+
+model ProductTemplate {
+  id          String                @id @default(cuid())
+  tenantId    String
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  status      RecordStatus          @default(ACTIVE)
+  sortOrder   Int                   @default(0)
+  items       ProductTemplateItem[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  deletedAt   DateTime?
+
+  @@index([tenantId, status])
+}
+
+model ProductTemplateItem {
+  id          String          @id @default(cuid())
+  tenantId    String
+  templateId  String
+  template    ProductTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  type        String
+  name        String
+  description String?
+  price       Decimal         @default(0) @db.Decimal(12, 2)
+  sortOrder   Int             @default(0)
+  status      RecordStatus    @default(ACTIVE)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([tenantId, templateId, type])
 }
 
 model Cart {

@@ -5,7 +5,8 @@ import { CategoryDraft, ProductDraft, useCatalog } from "../../app/providers/cat
 import { ProductCard } from "../../components/menu/product-card";
 import { PageHeader } from "../../components/ui/page-header";
 import { StatusBadge } from "../../components/ui/status-badge";
-import { MenuCategory, Product, ProductStatus } from "../../types/database";
+import { MenuCategory, Product, ProductStatus, ProductTemplate } from "../../types/database";
+import { menuService } from "../../services/menu";
 import { formatCurrency } from "../../utils/format";
 
 const emptyCategoryDraft: CategoryDraft = {
@@ -30,6 +31,20 @@ const emptyProductDraft: ProductDraft = {
   stockQuantity: 10,
   ingredients: [],
   complements: []
+};
+
+const emptyTemplateDraft = {
+  name: "",
+  description: "",
+  ingredients: [] as string[],
+  complements: [] as Array<{ name: string; price: number }>
+} satisfies TemplateDraft;
+
+type TemplateDraft = {
+  name: string;
+  description: string;
+  ingredients: string[];
+  complements: Array<{ name: string; price: number }>;
 };
 
 function categoryToDraft(category: MenuCategory): CategoryDraft {
@@ -89,8 +104,14 @@ export function AdminMenu() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [ingredientInput, setIngredientInput] = useState("");
   const [complementInput, setComplementInput] = useState({ name: "", price: "" });
+  const [templateDraft, setTemplateDraft] = useState(emptyTemplateDraft);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateIngredientInput, setTemplateIngredientInput] = useState("");
+  const [templateComplementInput, setTemplateComplementInput] = useState({ name: "", price: "" });
+  const [templates, setTemplates] = useState<ProductTemplate[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const categoriesWithProducts = categories.map((category) => ({
@@ -100,7 +121,16 @@ export function AdminMenu() {
 
   useEffect(() => {
     void refreshAdminCatalog();
+    void refreshTemplates();
   }, [refreshAdminCatalog]);
+
+  const refreshTemplates = async () => {
+    try {
+      setTemplates(await menuService.listTemplates());
+    } catch (error) {
+      toast.error(errorMessage(error, "Nao foi possivel carregar templates."));
+    }
+  };
 
   const scrollToCategory = (categoryId: string) => {
     document.getElementById(`admin-category-${categoryId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -146,6 +176,35 @@ export function AdminMenu() {
     setEditingProductId(null);
     setIngredientInput("");
     setComplementInput({ name: "", price: "" });
+  };
+
+  const openTemplateModal = () => {
+    setTemplateDraft(emptyTemplateDraft);
+    setEditingTemplateId(null);
+    setTemplateIngredientInput("");
+    setTemplateComplementInput({ name: "", price: "" });
+    setTemplateModalOpen(true);
+  };
+
+  const openEditTemplate = (template: ProductTemplate) => {
+    setTemplateDraft({
+      name: template.name,
+      description: template.description ?? "",
+      ingredients: template.items.filter((item) => item.type === "INGREDIENT").map((item) => item.name),
+      complements: template.items.filter((item) => item.type === "COMPLEMENT").map((item) => ({ name: item.name, price: item.price }))
+    });
+    setEditingTemplateId(template.id);
+    setTemplateIngredientInput("");
+    setTemplateComplementInput({ name: "", price: "" });
+    setTemplateModalOpen(true);
+  };
+
+  const closeTemplateModal = () => {
+    setTemplateDraft(emptyTemplateDraft);
+    setEditingTemplateId(null);
+    setTemplateIngredientInput("");
+    setTemplateComplementInput({ name: "", price: "" });
+    setTemplateModalOpen(false);
   };
 
   const handleCategorySubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -274,6 +333,101 @@ export function AdminMenu() {
     }));
   };
 
+  const applyTemplate = (template: ProductTemplate) => {
+    const ingredients = template.items.filter((item) => item.type === "INGREDIENT").map((item) => item.name);
+    const complements = template.items.filter((item) => item.type === "COMPLEMENT").map((item) => ({ name: item.name, price: item.price }));
+
+    setProductDraft((current) => ({
+      ...current,
+      ingredients,
+      complements
+    }));
+    setIngredientInput("");
+    setComplementInput({ name: "", price: "" });
+    toast.info(`Template "${template.name}" aplicado.`);
+  };
+
+  const addTemplateIngredient = () => {
+    const ingredient = templateIngredientInput.trim();
+    if (!ingredient) return;
+
+    setTemplateDraft((current) => ({ ...current, ingredients: [...current.ingredients, ingredient] }));
+    setTemplateIngredientInput("");
+  };
+
+  const removeTemplateIngredient = (index: number) => {
+    setTemplateDraft((current) => ({ ...current, ingredients: current.ingredients.filter((_, itemIndex) => itemIndex !== index) }));
+  };
+
+  const addTemplateComplement = () => {
+    const name = templateComplementInput.name.trim();
+    if (!name) return;
+
+    setTemplateDraft((current) => ({
+      ...current,
+      complements: [...current.complements, { name, price: Number(templateComplementInput.price.replace(",", ".")) || 0 }]
+    }));
+    setTemplateComplementInput({ name: "", price: "" });
+  };
+
+  const removeTemplateComplement = (index: number) => {
+    setTemplateDraft((current) => ({ ...current, complements: current.complements.filter((_, itemIndex) => itemIndex !== index) }));
+  };
+
+  const saveTemplateFromDraft = async () => {
+    const name = templateDraft.name.trim();
+
+    if (!name || (templateDraft.ingredients.length === 0 && templateDraft.complements.length === 0)) {
+      toast.warning("Informe um nome e adicione ingredientes ou complementos para criar o template.");
+      return;
+    }
+
+    const payload = {
+      name,
+      description: templateDraft.description,
+      items: [
+        ...templateDraft.ingredients.map((ingredient, index) => ({
+          type: "INGREDIENT" as const,
+          name: ingredient,
+          price: 0,
+          sortOrder: index + 1,
+          status: "ACTIVE" as const
+        })),
+        ...templateDraft.complements.map((complement, index) => ({
+          type: "COMPLEMENT" as const,
+          name: complement.name,
+          price: complement.price,
+          sortOrder: index + 1,
+          status: "ACTIVE" as const
+        }))
+      ]
+    };
+
+    try {
+      if (editingTemplateId) {
+        await menuService.updateTemplate(editingTemplateId, payload);
+      } else {
+        await menuService.createTemplate(payload);
+      }
+
+      await refreshTemplates();
+      closeTemplateModal();
+      toast.success(editingTemplateId ? "Template atualizado." : "Template salvo.");
+    } catch (error) {
+      toast.error(errorMessage(error, "Nao foi possivel salvar o template."));
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    try {
+      await menuService.deleteTemplate(templateId);
+      await refreshTemplates();
+      toast.success("Template excluido.");
+    } catch (error) {
+      toast.error(errorMessage(error, "Nao foi possivel excluir o template."));
+    }
+  };
+
   return (
     <section className="screen">
       <PageHeader
@@ -329,6 +483,35 @@ export function AdminMenu() {
           })}
         </article>
       </div>
+
+      <article className="panel">
+        <div className="panel-title-row">
+          <div>
+            <h2>Templates de preparo</h2>
+            <p className="muted-text">Modelos para popular ingredientes e adicionais ao cadastrar produtos.</p>
+          </div>
+          <button className="ghost-icon-button emphasis" onClick={openTemplateModal}>
+            <Plus size={18} /> Template
+          </button>
+        </div>
+        <div className="template-card-grid">
+          {templates.map((template) => (
+            <div className="template-card" key={template.id}>
+              <strong>{template.name}</strong>
+              <span>{template.items.filter((item) => item.type === "INGREDIENT").length} ingredientes</span>
+              <span>{template.items.filter((item) => item.type === "COMPLEMENT").length} adicionais</span>
+              <div className="row-actions wide">
+                <button onClick={() => openEditTemplate(template)}>
+                  <Edit3 size={16} /> Editar
+                </button>
+                <button onClick={() => void handleDeleteTemplate(template.id)}>
+                  <Trash2 size={16} /> Excluir
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </article>
 
       <section className="section-block">
         <div className="panel-title-row">
@@ -455,6 +638,88 @@ export function AdminMenu() {
 
             <button className="primary-button" disabled={submitting} type="submit">
               <Save size={17} /> {editingCategoryId ? "Salvar categoria" : "Criar categoria"}
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      {templateModalOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <form
+            className="modal-card product-modal"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveTemplateFromDraft();
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cadastro de template"
+          >
+            <div className="modal-header">
+              <div>
+                <span className="eyebrow">Template</span>
+                <h2>{editingTemplateId ? "Editar template" : "Novo template de preparo"}</h2>
+              </div>
+              <button aria-label="Fechar modal" className="ghost-icon-button" onClick={closeTemplateModal} type="button">
+                <X size={18} />
+              </button>
+            </div>
+
+            <label className="field">
+              <span>Nome do template</span>
+              <div>
+                <input value={templateDraft.name} onChange={(event) => setTemplateDraft({ ...templateDraft, name: event.target.value })} placeholder="Ex: Hamburguer artesanal" />
+              </div>
+            </label>
+
+            <label className="field">
+              <span>Descricao</span>
+              <div>
+                <input
+                  value={templateDraft.description}
+                  onChange={(event) => setTemplateDraft({ ...templateDraft, description: event.target.value })}
+                  placeholder="Ex: base dos lanches da casa"
+                />
+              </div>
+            </label>
+
+            <div className="editable-list-block">
+              <span>Ingredientes padrao</span>
+              <div className="inline-add-row">
+                <input value={templateIngredientInput} onChange={(event) => setTemplateIngredientInput(event.target.value)} placeholder="Ex: pao brioche" />
+                <button aria-label="Adicionar ingrediente ao template" onClick={addTemplateIngredient} type="button">
+                  <Plus size={18} />
+                </button>
+              </div>
+              <div className="editable-chip-list">
+                {templateDraft.ingredients.map((ingredient, index) => (
+                  <button key={`${ingredient}-${index}`} onClick={() => removeTemplateIngredient(index)} type="button">
+                    {ingredient} <X size={14} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="editable-list-block">
+              <span>Adicionais</span>
+              <div className="inline-add-row complement-row">
+                <input value={templateComplementInput.name} onChange={(event) => setTemplateComplementInput({ ...templateComplementInput, name: event.target.value })} placeholder="Ex: bacon" />
+                <input value={templateComplementInput.price} onChange={(event) => setTemplateComplementInput({ ...templateComplementInput, price: event.target.value })} placeholder="Valor" />
+                <button aria-label="Adicionar adicional ao template" onClick={addTemplateComplement} type="button">
+                  <Plus size={18} />
+                </button>
+              </div>
+              <div className="editable-chip-list">
+                {templateDraft.complements.map((complement, index) => (
+                  <button key={`${complement.name}-${index}`} onClick={() => removeTemplateComplement(index)} type="button">
+                    {complement.name} {formatCurrency(complement.price)} <X size={14} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button className="primary-button" type="submit">
+              <Save size={17} /> {editingTemplateId ? "Atualizar template" : "Salvar template"}
             </button>
           </form>
         </div>
@@ -615,6 +880,28 @@ export function AdminMenu() {
                 <input value={productDraft.imageUrl} onChange={(event) => setProductDraft({ ...productDraft, imageUrl: event.target.value })} />
               </div>
             </label>
+
+            <div className="editable-list-block">
+              <span>Templates de preparo</span>
+              <div className="template-select-field">
+                <select
+                  defaultValue=""
+                  onChange={(event) => {
+                    const template = templates.find((item) => item.id === event.target.value);
+                    if (template) applyTemplate(template);
+                  }}
+                >
+                  <option value="" disabled>
+                    Selecionar template
+                  </option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             <div className="editable-list-block">
               <span>Ingredientes</span>

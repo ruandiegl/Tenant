@@ -163,6 +163,26 @@ export type OptionItem = BaseEntity & {
   sortOrder: number;
 };
 
+export type ProductTemplateItem = BaseEntity & {
+  tenantId: string;
+  templateId: string;
+  type: "INGREDIENT" | "COMPLEMENT";
+  name: string;
+  description?: string;
+  price: number;
+  sortOrder: number;
+  status: "ACTIVE" | "INACTIVE" | "ARCHIVED";
+};
+
+export type ProductTemplate = BaseEntity & {
+  tenantId: string;
+  name: string;
+  description?: string;
+  status: "ACTIVE" | "INACTIVE" | "ARCHIVED";
+  sortOrder: number;
+  items: ProductTemplateItem[];
+};
+
 export type Cart = BaseEntity & {
   tenantId: string;
   customerId?: string;

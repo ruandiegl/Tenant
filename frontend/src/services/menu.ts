@@ -1,4 +1,4 @@
-import { MenuCategory, Product, ProductAvailability } from "../types/database";
+import { MenuCategory, Product, ProductAvailability, ProductTemplate } from "../types/database";
 import { api, protectedApi } from "./api";
 
 const TENANT_SLUG = import.meta.env.VITE_DEMO_TENANT_SLUG ?? "demo-burger";
@@ -44,6 +44,21 @@ type ProductPayload = {
     required?: boolean;
     sortOrder?: number;
     options?: Array<{ name: string; description?: string; price?: number; sortOrder?: number }>;
+  }>;
+};
+
+type ProductTemplatePayload = {
+  name: string;
+  description?: string;
+  status?: ProductTemplate["status"];
+  sortOrder?: number;
+  items?: Array<{
+    type: "INGREDIENT" | "COMPLEMENT";
+    name: string;
+    description?: string;
+    price?: number;
+    sortOrder?: number;
+    status?: "ACTIVE" | "INACTIVE" | "ARCHIVED";
   }>;
 };
 
@@ -117,6 +132,20 @@ function flattenPublicMenu(data: PublicMenuResponse) {
   return { categories, products, productAvailability };
 }
 
+function mapTemplate(template: ProductTemplate): ProductTemplate {
+  return {
+    ...template,
+    description: template.description ?? "",
+    status: template.status ?? "ACTIVE",
+    items: template.items.map((item) => ({
+      ...item,
+      description: item.description ?? "",
+      price: Number(item.price),
+      status: item.status ?? "ACTIVE"
+    }))
+  };
+}
+
 export const menuService = {
   getPublicMenu: async () => {
     return flattenPublicMenu(await api<PublicMenuResponse>(`/public/${TENANT_SLUG}/menu`));
@@ -182,5 +211,26 @@ export const menuService = {
   deleteProduct: (productId: string) =>
     protectedApi<BackendProduct>(`/tenant/menu/products/${productId}`, {
       method: "DELETE"
-    })
+    }),
+  listTemplates: async () => (await protectedApi<ProductTemplate[]>("/tenant/menu/templates")).map(mapTemplate),
+  createTemplate: (payload: ProductTemplatePayload) =>
+    protectedApi<ProductTemplate>("/tenant/menu/templates", {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        description: optionalText(payload.description)
+      })
+    }).then(mapTemplate),
+  updateTemplate: (templateId: string, payload: ProductTemplatePayload) =>
+    protectedApi<ProductTemplate>(`/tenant/menu/templates/${templateId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...payload,
+        description: optionalText(payload.description)
+      })
+    }).then(mapTemplate),
+  deleteTemplate: (templateId: string) =>
+    protectedApi<ProductTemplate>(`/tenant/menu/templates/${templateId}`, {
+      method: "DELETE"
+    }).then(mapTemplate)
 };

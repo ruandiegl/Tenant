@@ -71,6 +71,34 @@ export const deleteProductSchema = z.object({
   params: z.object({ id: z.string().min(1) })
 });
 
+const templateItemSchema = z.object({
+  type: z.enum(["INGREDIENT", "COMPLEMENT"]),
+  name: z.string().min(2),
+  description: z.string().optional(),
+  price: z.number().nonnegative().optional(),
+  sortOrder: z.number().int().optional(),
+  status: z.enum(["ACTIVE", "INACTIVE", "ARCHIVED"]).optional()
+});
+
+export const createTemplateSchema = z.object({
+  body: z.object({
+    name: z.string().min(2),
+    description: z.string().optional(),
+    status: z.enum(["ACTIVE", "INACTIVE", "ARCHIVED"]).optional(),
+    sortOrder: z.number().int().optional(),
+    items: z.array(templateItemSchema).optional()
+  })
+});
+
+export const updateTemplateSchema = createTemplateSchema.deepPartial().extend({
+  params: z.object({ id: z.string().min(1) }),
+  body: createTemplateSchema.shape.body.partial()
+});
+
+export const deleteTemplateSchema = z.object({
+  params: z.object({ id: z.string().min(1) })
+});
+
 export const publicMenuSchema = z.object({
   params: z.object({ tenantSlug: z.string().min(1) }),
   query: z.object({
