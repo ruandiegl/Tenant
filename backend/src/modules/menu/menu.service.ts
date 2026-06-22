@@ -1,4 +1,7 @@
 import { Prisma, ProductStatus, RecordStatus } from "@prisma/client";
+import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 
@@ -37,7 +40,14 @@ type ProductInput = {
   isFeatured?: boolean;
   sortOrder?: number;
   stockQuantity?: number;
+  imageUpload?: ImageUploadInput;
   optionGroups?: OptionGroupInput[];
+};
+
+type ImageUploadInput = {
+  fileName: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  dataBase64: string;
 };
 
 type TemplateInput = {
@@ -164,6 +174,50 @@ const createOptionGroups = (tenantId: string, groups: OptionGroupInput[]) => ({
   }))
 });
 
+const imageExtensions: Record<ImageUploadInput["mimeType"], string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp"
+};
+
+const saveProductUpload = async (tenantId: string, productId: string, upload?: ImageUploadInput) => {
+  if (!upload) return null;
+
+  const buffer = Buffer.from(upload.dataBase64, "base64");
+  const maxBytes = 5 * 1024 * 1024;
+
+  if (buffer.byteLength > maxBytes) {
+    throw new AppError("Image must be up to 5MB", 400);
+  }
+
+  const extension = imageExtensions[upload.mimeType];
+  const fileName = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const relativePath = path.join("products", tenantId, productId);
+  const uploadDir = path.resolve(process.cwd(), "uploads", relativePath);
+
+  await fs.mkdir(uploadDir, { recursive: true });
+  await fs.writeFile(path.join(uploadDir, fileName), buffer);
+
+  const url = `/uploads/${relativePath.replace(/\\/g, "/")}/${fileName}`;
+
+  await prisma.productImage.create({
+    data: {
+      tenantId,
+      productId,
+      url,
+      alt: upload.fileName,
+      sortOrder: 0
+    }
+  });
+
+  await prisma.product.update({
+    where: { id: productId },
+    data: { imageUrl: url }
+  });
+
+  return url;
+};
+
 const createTemplateItems = (tenantId: string, items: NonNullable<TemplateInput["items"]>) => ({
   create: items.map((item, index) => ({
     tenantId,
@@ -285,7 +339,7 @@ export const createProduct = async (tenantId: string, data: ProductInput & { cat
   const branchId = await getDefaultBranchId(tenantId, data.branchId ?? category.branchId);
   const status = normalizeProductStatus(data.status ?? "ACTIVE", data.stockQuantity);
 
-  return prisma.product.create({
+  const product = await prisma.product.create({
     data: {
       tenantId,
       categoryId: data.categoryId,
@@ -312,6 +366,13 @@ export const createProduct = async (tenantId: string, data: ProductInput & { cat
     },
     include: productInclude
   });
+
+  await saveProductUpload(tenantId, product.id, data.imageUpload);
+
+  return prisma.product.findUniqueOrThrow({
+    where: { id: product.id },
+    include: productInclude
+  });
 };
 
 export const listProducts = (tenantId: string) => {
@@ -336,7 +397,7 @@ export const updateProduct = async (tenantId: string, id: string, data: ProductI
   const branchId = await getDefaultBranchId(tenantId, data.branchId ?? category.branchId ?? product.availability[0]?.branchId);
   const status = normalizeProductStatus(data.status, data.stockQuantity);
 
-  return prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     if (data.optionGroups !== undefined) {
       const groups = await tx.optionGroup.findMany({
         where: { tenantId, productId: id },
@@ -387,10 +448,13 @@ export const updateProduct = async (tenantId: string, id: string, data: ProductI
       });
     }
 
-    return tx.product.findUniqueOrThrow({
-      where: { id },
-      include: productInclude
-    });
+  });
+
+  await saveProductUpload(tenantId, id, data.imageUpload);
+
+  return prisma.product.findUniqueOrThrow({
+    where: { id },
+    include: productInclude
   });
 };
 

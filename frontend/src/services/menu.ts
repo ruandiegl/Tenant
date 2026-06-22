@@ -1,5 +1,5 @@
 import { MenuCategory, Product, ProductAvailability, ProductTemplate } from "../types/database";
-import { api, protectedApi } from "./api";
+import { api, getApiBaseUrl, protectedApi } from "./api";
 
 const TENANT_SLUG = import.meta.env.VITE_DEMO_TENANT_SLUG ?? "demo-burger";
 
@@ -30,6 +30,11 @@ type ProductPayload = {
   description?: string;
   sku?: string;
   imageUrl?: string;
+  imageUpload?: {
+    fileName: string;
+    mimeType: "image/jpeg" | "image/png" | "image/webp";
+    dataBase64: string;
+  };
   basePrice: number;
   promotionalPrice?: number;
   costPrice?: number;
@@ -67,6 +72,12 @@ function optionalText(value: string | undefined) {
   return normalized ? normalized : undefined;
 }
 
+function resolveImageUrl(value: string | undefined) {
+  if (!value) return "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=80";
+  if (value.startsWith("/uploads/")) return `${getApiBaseUrl()}${value}`;
+  return value;
+}
+
 function mapProduct(product: BackendProduct): Product {
   return {
     ...product,
@@ -75,9 +86,7 @@ function mapProduct(product: BackendProduct): Product {
     costPrice: product.costPrice === undefined || product.costPrice === null ? undefined : Number(product.costPrice),
     description: product.description ?? "",
     sku: product.sku ?? "",
-    imageUrl:
-      product.imageUrl ||
-      "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=80",
+    imageUrl: resolveImageUrl(product.imageUrl),
     preparationTime: product.preparationTime ?? 20,
     optionGroups:
       product.optionGroups?.map((group) => ({
@@ -195,7 +204,7 @@ export const menuService = {
         ...payload,
         description: optionalText(payload.description),
         sku: optionalText(payload.sku),
-        imageUrl: optionalText(payload.imageUrl)
+        imageUrl: payload.imageUpload ? undefined : optionalText(payload.imageUrl)
       })
     }),
   updateProduct: (productId: string, payload: ProductPayload) =>
@@ -205,7 +214,7 @@ export const menuService = {
         ...payload,
         description: optionalText(payload.description),
         sku: optionalText(payload.sku),
-        imageUrl: optionalText(payload.imageUrl)
+        imageUrl: payload.imageUpload ? undefined : optionalText(payload.imageUrl)
       })
     }),
   deleteProduct: (productId: string) =>

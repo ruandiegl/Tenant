@@ -15,6 +15,11 @@ export type ProductDraft = {
   description: string;
   sku: string;
   imageUrl: string;
+  imageUpload?: {
+    fileName: string;
+    mimeType: "image/jpeg" | "image/png" | "image/webp";
+    dataBase64: string;
+  };
   basePrice: number;
   promotionalPrice?: number;
   costPrice?: number;
@@ -109,6 +114,7 @@ function toProductPayload(draft: ProductDraft) {
     description: draft.description,
     sku: draft.sku,
     imageUrl: draft.imageUrl,
+    imageUpload: draft.imageUpload,
     basePrice: draft.basePrice,
     promotionalPrice: draft.promotionalPrice,
     costPrice: draft.costPrice,

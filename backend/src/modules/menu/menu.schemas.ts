@@ -22,6 +22,12 @@ export const deleteCategorySchema = z.object({
   params: z.object({ id: z.string().min(1) })
 });
 
+const imageUploadSchema = z.object({
+  fileName: z.string().min(1),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  dataBase64: z.string().min(1)
+});
+
 export const createProductSchema = z.object({
   body: z.object({
     branchId: z.string().optional(),
@@ -38,6 +44,7 @@ export const createProductSchema = z.object({
     isFeatured: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
     stockQuantity: z.number().int().nonnegative().optional(),
+    imageUpload: imageUploadSchema.optional(),
     optionGroups: z
       .array(
         z.object({

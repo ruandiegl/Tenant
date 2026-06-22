@@ -22,6 +22,7 @@ const emptyProductDraft: ProductDraft = {
   description: "",
   sku: "",
   imageUrl: "",
+  imageUpload: undefined,
   basePrice: 0,
   promotionalPrice: undefined,
   costPrice: undefined,
@@ -66,6 +67,7 @@ function productToDraft(product: Product, stockQuantity: number): ProductDraft {
     description: product.description ?? "",
     sku: product.sku ?? "",
     imageUrl: product.imageUrl ?? "",
+    imageUpload: undefined,
     basePrice: product.basePrice,
     promotionalPrice: product.promotionalPrice,
     costPrice: product.costPrice,
@@ -80,6 +82,40 @@ function productToDraft(product: Product, stockQuantity: number): ProductDraft {
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function formatMoneyInput(value: number | undefined) {
+  if (value === undefined) return "";
+
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
+function parseMoneyInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits ? Number(digits) / 100 : 0;
+}
+
+function readImageUpload(file: File) {
+  return new Promise<NonNullable<ProductDraft["imageUpload"]>>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = String(reader.result);
+      const [, dataBase64 = ""] = result.split(",");
+
+      resolve({
+        fileName: file.name,
+        mimeType: file.type as NonNullable<ProductDraft["imageUpload"]>["mimeType"],
+        dataBase64
+      });
+    };
+
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 export function AdminMenu() {
@@ -345,6 +381,34 @@ export function AdminMenu() {
     setIngredientInput("");
     setComplementInput({ name: "", price: "" });
     toast.info(`Template "${template.name}" aplicado.`);
+  };
+
+  const handleProductImageChange = async (file: File | undefined) => {
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.warning("Use uma imagem JPG, PNG ou WebP.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warning("A imagem deve ter ate 5MB.");
+      return;
+    }
+
+    try {
+      const imageUpload = await readImageUpload(file);
+      setProductDraft((current) => ({
+        ...current,
+        imageUrl: URL.createObjectURL(file),
+        imageUpload
+      }));
+      toast.info("Imagem selecionada para envio.");
+    } catch {
+      toast.error("Nao foi possivel ler a imagem.");
+    }
   };
 
   const addTemplateIngredient = () => {
@@ -788,11 +852,10 @@ export function AdminMenu() {
                 <span>Preco base</span>
                 <div>
                   <input
-                    min="0"
-                    step="0.01"
-                    type="number"
-                    value={productDraft.basePrice}
-                    onChange={(event) => setProductDraft({ ...productDraft, basePrice: Number(event.target.value) })}
+                    inputMode="numeric"
+                    placeholder="0,00"
+                    value={formatMoneyInput(productDraft.basePrice)}
+                    onChange={(event) => setProductDraft({ ...productDraft, basePrice: parseMoneyInput(event.target.value) })}
                   />
                 </div>
               </label>
@@ -801,14 +864,13 @@ export function AdminMenu() {
                 <span>Preco promocional</span>
                 <div>
                   <input
-                    min="0"
-                    step="0.01"
-                    type="number"
-                    value={productDraft.promotionalPrice ?? ""}
+                    inputMode="numeric"
+                    placeholder="0,00"
+                    value={formatMoneyInput(productDraft.promotionalPrice)}
                     onChange={(event) =>
                       setProductDraft({
                         ...productDraft,
-                        promotionalPrice: event.target.value ? Number(event.target.value) : undefined
+                        promotionalPrice: event.target.value.replace(/\D/g, "") ? parseMoneyInput(event.target.value) : undefined
                       })
                     }
                   />
@@ -819,12 +881,14 @@ export function AdminMenu() {
                 <span>Custo</span>
                 <div>
                   <input
-                    min="0"
-                    step="0.01"
-                    type="number"
-                    value={productDraft.costPrice ?? ""}
+                    inputMode="numeric"
+                    placeholder="0,00"
+                    value={formatMoneyInput(productDraft.costPrice)}
                     onChange={(event) =>
-                      setProductDraft({ ...productDraft, costPrice: event.target.value ? Number(event.target.value) : undefined })
+                      setProductDraft({
+                        ...productDraft,
+                        costPrice: event.target.value.replace(/\D/g, "") ? parseMoneyInput(event.target.value) : undefined
+                      })
                     }
                   />
                 </div>
@@ -877,12 +941,18 @@ export function AdminMenu() {
             <label className="field">
               <span>Imagem</span>
               <div>
-                <input value={productDraft.imageUrl} onChange={(event) => setProductDraft({ ...productDraft, imageUrl: event.target.value })} />
+                <input accept="image/jpeg,image/png,image/webp" onChange={(event) => void handleProductImageChange(event.target.files?.[0])} type="file" />
               </div>
             </label>
+            {productDraft.imageUrl ? (
+              <div className="product-image-preview">
+                <img src={productDraft.imageUrl} alt="Previa do produto" />
+                <span>{productDraft.imageUpload ? "Imagem pronta para upload" : "Imagem atual do produto"}</span>
+              </div>
+            ) : null}
 
             <div className="editable-list-block">
-              <span>Templates de preparo</span>
+              <span>Templates de ingredientes</span>
               <div className="template-select-field">
                 <select
                   defaultValue=""
