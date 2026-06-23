@@ -542,6 +542,9 @@ export const reportSummary: ReportSummary = {
   revenueToday: 2842.7,
   averageTicket: 76.83,
   averagePreparationMinutes: 21,
+  openOrders: 26,
+  cancelledOrders: 2,
+  cancellationRate: 0.05,
   ordersByStatus: {
     DRAFT: 0,
     PLACED: 6,
@@ -558,5 +561,21 @@ export const reportSummary: ReportSummary = {
     { productId: "prod_salmon_bowl", name: "Salmon Bowl", quantity: 18, revenue: 808.2 },
     { productId: "prod_frango_lemon", name: "Frango Lemon Bowl", quantity: 12, revenue: 478.8 },
     { productId: "prod_suco_verde", name: "Suco Verde", quantity: 21, revenue: 333.9 }
+  ],
+  ordersByType: [
+    { type: "DELIVERY", orders: 24, revenue: 1920.4 },
+    { type: "PICKUP", orders: 13, revenue: 922.3 }
+  ],
+  paymentsByMethod: [
+    { method: "PIX", count: 22, revenue: 1760.2 },
+    { method: "CREDIT_CARD", count: 10, revenue: 784.5 },
+    { method: "CASH", count: 5, revenue: 298 }
+  ],
+  hourlySales: [
+    { hour: 11, orders: 4, revenue: 302.4 },
+    { hour: 12, orders: 11, revenue: 860.8 },
+    { hour: 13, orders: 8, revenue: 612.1 },
+    { hour: 19, orders: 9, revenue: 704.9 },
+    { hour: 20, orders: 5, revenue: 362.5 }
   ]
 };

@@ -14,7 +14,7 @@ export function AdminOrders() {
     onSuccess: (order) => {
       toast.success(`Pedido #${order.publicCode} atualizado para ${order.status}.`);
       void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-summary"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-summary"], refetchType: "all" });
     },
     onError: () => {
       toast.error("Nao foi possivel atualizar o status do pedido.");

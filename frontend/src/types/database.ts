@@ -312,6 +312,12 @@ export type ReportSummary = {
   revenueToday: number;
   averageTicket: number;
   averagePreparationMinutes: number;
+  openOrders: number;
+  cancelledOrders: number;
+  cancellationRate: number;
   ordersByStatus: Record<OrderStatus, number>;
   topProducts: Array<{ productId: string; name: string; quantity: number; revenue: number }>;
+  ordersByType: Array<{ type: string; orders: number; revenue: number }>;
+  paymentsByMethod: Array<{ method: string; count: number; revenue: number }>;
+  hourlySales: Array<{ hour: number; orders: number; revenue: number }>;
 };

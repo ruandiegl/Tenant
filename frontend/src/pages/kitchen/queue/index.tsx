@@ -79,7 +79,7 @@ export function KitchenQueue() {
       toast.info(`Pedido #${order.publicCode} movido para ${order.status}.`);
       void queryClient.invalidateQueries({ queryKey: ["kitchen-orders"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-summary"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-summary"], refetchType: "all" });
       if (selectedOrderId) {
         void queryClient.invalidateQueries({ queryKey: ["order-details", selectedOrderId] });
       }

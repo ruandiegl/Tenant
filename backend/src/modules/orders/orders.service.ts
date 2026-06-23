@@ -34,17 +34,37 @@ type CreateOrderInput = {
 
 const statusDateField = (status: OrderStatus) => {
   const now = new Date();
-  const map: Partial<Record<OrderStatus, object>> = {
-    ACCEPTED: { acceptedAt: now },
-    PREPARING: { startedAt: now },
-    READY: { readyAt: now },
-    DISPATCHED: { dispatchedAt: now },
-    DELIVERED: { completedAt: now },
-    COMPLETED: { completedAt: now },
-    CANCELLED: { cancelledAt: now }
-  };
+  const base = status !== "CANCELLED" && status !== "REJECTED" ? { cancelledAt: null, cancelReason: null } : {};
 
-  return map[status] ?? {};
+  if (status === "PLACED") {
+    return { ...base, acceptedAt: null, startedAt: null, readyAt: null, dispatchedAt: null, completedAt: null };
+  }
+
+  if (status === "ACCEPTED") {
+    return { ...base, acceptedAt: now, startedAt: null, readyAt: null, dispatchedAt: null, completedAt: null };
+  }
+
+  if (status === "PREPARING") {
+    return { ...base, startedAt: now, readyAt: null, dispatchedAt: null, completedAt: null };
+  }
+
+  if (status === "READY") {
+    return { ...base, readyAt: now, dispatchedAt: null, completedAt: null };
+  }
+
+  if (status === "DISPATCHED") {
+    return { ...base, dispatchedAt: now, completedAt: null };
+  }
+
+  if (status === "DELIVERED" || status === "COMPLETED") {
+    return { ...base, completedAt: now };
+  }
+
+  if (status === "CANCELLED" || status === "REJECTED") {
+    return { cancelledAt: now };
+  }
+
+  return base;
 };
 
 const emitOrderEvent = (event: string, order: { id: string; tenantId: string; branchId: string }) => {
