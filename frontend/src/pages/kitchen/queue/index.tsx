@@ -1,14 +1,16 @@
 import "./styles.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useSocket } from "../../../app/providers/socket-provider";
+import { PeriodFilter } from "../../../components/filters/period-filter";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { ordersService } from "../../../services/orders";
 import { Order, OrderStatus } from "../../../types/database";
 import { formatCurrency, formatTime } from "../../../utils/format";
+import { addDays, getPeriodRange, toDateInputValue, type PeriodFilterValue } from "../../../utils/period-range";
 
 type KitchenColumn = {
   id: string;
@@ -67,7 +69,18 @@ export function KitchenQueue() {
   const queryClient = useQueryClient();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(() => new Set());
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const { data: orders = [], isLoading } = useQuery({ queryKey: ["kitchen-orders"], queryFn: ordersService.list });
+  const [period, setPeriod] = useState<PeriodFilterValue>("today");
+  const [customStartDate, setCustomStartDate] = useState(() => toDateInputValue(addDays(new Date(), -6)));
+  const [customEndDate, setCustomEndDate] = useState(() => toDateInputValue(new Date()));
+  const range = useMemo(() => getPeriodRange(period, customStartDate, customEndDate), [customEndDate, customStartDate, period]);
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ["kitchen-orders", range.from, range.to],
+    queryFn: () => ordersService.list(range),
+    refetchInterval: 5000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0
+  });
   const { data: selectedOrder, isFetching: isFetchingDetails } = useQuery({
     enabled: Boolean(selectedOrderId),
     queryKey: ["order-details", selectedOrderId],
@@ -110,6 +123,16 @@ export function KitchenQueue() {
         actions={<span className="connection">{socket.lastEvent}</span>}
       />
 
+      <PeriodFilter
+        ariaLabel="Filtro de periodo da cozinha"
+        customEndDate={customEndDate}
+        customStartDate={customStartDate}
+        onCustomEndDateChange={setCustomEndDate}
+        onCustomStartDateChange={setCustomStartDate}
+        onPeriodChange={setPeriod}
+        period={period}
+      />
+
       {isLoading ? <p className="muted-text">Carregando pedidos...</p> : null}
 
       <div className="kitchen-board">
@@ -140,7 +163,7 @@ export function KitchenQueue() {
                   />
                 ))}
 
-                {columnOrders.length === 0 ? <p className="muted-text">Nenhum pedido nesta etapa.</p> : null}
+                {columnOrders.length === 0 ? <p className="muted-text">Nenhum pedido nesta etapa para o periodo.</p> : null}
               </div>
             </section>
           );

@@ -340,9 +340,11 @@ export const getPublicOrder = async (tenantSlug: string, publicCodeValue: string
   return order;
 };
 
-export const listTenantOrders = (tenantId: string, branchId?: string, status?: OrderStatus) => {
+export const listTenantOrders = (tenantId: string, branchId?: string, status?: OrderStatus, from?: string, to?: string) => {
+  const createdAt = from || to ? { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined } : undefined;
+
   return prisma.order.findMany({
-    where: { tenantId, branchId, status },
+    where: { tenantId, branchId, status, createdAt },
     include: { items: { include: { options: true } }, kitchenTicket: true },
     orderBy: { createdAt: "desc" }
   });

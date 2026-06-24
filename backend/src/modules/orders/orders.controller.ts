@@ -19,7 +19,15 @@ export const getPublic: RequestHandler = async (req, res, next) => {
 
 export const list: RequestHandler = async (req, res, next) => {
   try {
-    return res.json(await service.listTenantOrders(req.tenantId!, req.query.branchId as string | undefined, req.query.status as never));
+    return res.json(
+      await service.listTenantOrders(
+        req.tenantId!,
+        req.query.branchId as string | undefined,
+        req.query.status as never,
+        req.query.from as string | undefined,
+        req.query.to as string | undefined
+      )
+    );
   } catch (error) {
     return next(error);
   }

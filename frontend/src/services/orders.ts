@@ -71,7 +71,15 @@ function mapOrder(order: BackendOrder): Order {
 }
 
 export const ordersService = {
-  list: async () => (await protectedApi<BackendOrder[]>("/tenant/orders")).map(mapOrder),
+  list: async (params?: { from?: string; to?: string }) => {
+    const searchParams = new URLSearchParams();
+
+    if (params?.from) searchParams.set("from", params.from);
+    if (params?.to) searchParams.set("to", params.to);
+
+    const suffix = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
+    return (await protectedApi<BackendOrder[]>(`/tenant/orders${suffix}`)).map(mapOrder);
+  },
   get: async (orderId: string) => mapOrder(await protectedApi<BackendOrder>(`/tenant/orders/${orderId}`)),
   getByPublicCode: async (publicCode: string) => mapOrder(await api<BackendOrder>(`/public/${TENANT_SLUG}/orders/${publicCode}`)),
   createPublicOrder: async (payload: PublicOrderPayload) => {

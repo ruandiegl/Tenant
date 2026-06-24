@@ -1,7 +1,7 @@
 import cors from "cors";
 import express from "express";
-import helmet from "helmet";
 import morgan from "morgan";
+import { createRequire } from "node:module";
 import path from "node:path";
 import swaggerUi from "swagger-ui-express";
 import { env } from "./config/env.js";
@@ -18,6 +18,9 @@ import { reportsRoutes } from "./modules/reports/reports.routes.js";
 import { adminTenantRoutes, publicTenantRoutes } from "./modules/tenants/tenants.routes.js";
 import { usersRoutes } from "./modules/users/users.routes.js";
 import { errorMiddleware } from "./shared/middlewares/error.middleware.js";
+
+const nodeRequire = createRequire(import.meta.url);
+const helmet = nodeRequire("helmet") as (options?: Record<string, unknown>) => express.RequestHandler;
 
 export const app = express();
 
@@ -52,3 +55,5 @@ app.use("/public", publicMenuRoutes);
 app.use("/public", publicOrdersRoutes);
 
 app.use(errorMiddleware);
+
+export default app;

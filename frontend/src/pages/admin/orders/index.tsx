@@ -8,7 +8,7 @@ import { OrderStatus } from "../../../types/database";
 
 export function AdminOrders() {
   const queryClient = useQueryClient();
-  const { data: orders } = useQuery({ queryKey: ["admin-orders"], queryFn: ordersService.list });
+  const { data: orders } = useQuery({ queryKey: ["admin-orders"], queryFn: () => ordersService.list() });
   const updateStatus = useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: OrderStatus }) => ordersService.updateStatus(orderId, status),
     onSuccess: (order) => {
