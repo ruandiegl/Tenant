@@ -23,7 +23,10 @@
 }
 
 .customer-screen .brand-hero h1 {
+  font-family: var(--font-customer);
   font-size: clamp(2.4rem, 12vw, 5.8rem);
+  font-weight: 800;
+  letter-spacing: 0;
   line-height: 0.95;
   margin: 6px 0;
   max-width: 820px;
@@ -31,6 +34,7 @@
 
 .customer-screen .brand-hero p,
 .customer-screen .brand-hero span {
+  font-family: var(--font-customer);
   margin: 0;
   max-width: 560px;
 }
@@ -63,7 +67,10 @@
 }
 
 .category-section-header h3 {
+  font-family: var(--font-customer);
   font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0;
   margin: 0;
 }
 
@@ -133,6 +140,12 @@
 .customizer-option div {
   display: grid;
   gap: 3px;
+}
+
+.customizer-option strong {
+  font-family: var(--font-customer);
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .customizer-option span,

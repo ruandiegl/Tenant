@@ -1,11 +1,14 @@
 import "./styles.css";
 import { FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Mail, Phone, UserRound } from "lucide-react";
 import { useCustomerFlow } from "../../../app/providers/customer-flow-provider";
 import { PageHeader } from "../../../components/ui/page-header";
+import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../../../utils/public-tenant-route";
 
 export function CustomerProfile() {
+  const location = useLocation();
+  const tenantSlug = getPublicTenantSlug(location.pathname) ?? DEFAULT_PUBLIC_TENANT_SLUG;
   const { profile, updateProfile } = useCustomerFlow();
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -61,7 +64,7 @@ export function CustomerProfile() {
         <p className="muted-text">
           Para finalizar como convidado, basta preencher endereco e pagamento no carrinho. A conta pode ficar para depois.
         </p>
-        <Link className="wide-link" to="/cliente/carrinho">
+        <Link className="wide-link" to={publicTenantPath(tenantSlug, "/carrinho")}>
           Ir para o carrinho
         </Link>
       </article>

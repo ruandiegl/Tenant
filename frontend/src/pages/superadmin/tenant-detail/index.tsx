@@ -1,14 +1,14 @@
 import "../styles.css";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarClock, Loader2, Save, ShieldAlert, Store, Users } from "lucide-react";
+import { ArrowLeft, CalendarClock, Copy, Loader2, Save, ShieldAlert, Store, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { PlanBadge } from "../../../components/tenant-management/plan-badge";
 import { UsageBar } from "../../../components/tenant-management/usage-bar";
-import { PlanName, tenantManagementService } from "../../../services/tenant-management";
+import { tenantManagementService } from "../../../services/tenant-management";
 import { TenantStatus } from "../../../types/database";
 
 const statusOptions: Array<{ value: TenantStatus; label: string }> = [
@@ -23,13 +23,29 @@ export function SuperAdminTenantDetail() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<TenantStatus>("SUSPENDED");
   const [statusReason, setStatusReason] = useState("");
-  const [planName, setPlanName] = useState<PlanName>("BASIC");
+  const [planId, setPlanId] = useState("");
   const [planReason, setPlanReason] = useState("");
   const { data: tenant, isLoading } = useQuery({
     queryKey: ["tenant-management", "tenant", id],
     queryFn: () => tenantManagementService.getTenant(id),
     enabled: Boolean(id)
   });
+  const { data: plans = [] } = useQuery({
+    queryKey: ["tenant-management", "plans"],
+    queryFn: tenantManagementService.listPlans
+  });
+  const activePlans = plans.filter((plan) => plan.status === "ACTIVE");
+
+  useEffect(() => {
+    if (tenant?.plan.id) {
+      setPlanId(tenant.plan.id);
+      return;
+    }
+
+    if (!planId && activePlans[0]?.id) {
+      setPlanId(activePlans[0].id);
+    }
+  }, [activePlans, planId, tenant?.plan.id]);
   const statusMutation = useMutation({
     mutationFn: () => tenantManagementService.updateTenantStatus(id, { status, reason: statusReason }),
     onSuccess: async () => {
@@ -40,13 +56,21 @@ export function SuperAdminTenantDetail() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel alterar o status.")
   });
   const planMutation = useMutation({
-    mutationFn: () => tenantManagementService.updateTenantPlan(id, { planName, reason: planReason || undefined }),
+    mutationFn: () => tenantManagementService.updateTenantPlan(id, { planId, reason: planReason || undefined }),
     onSuccess: async () => {
       toast.success("Plano atualizado.");
       setPlanReason("");
       await queryClient.invalidateQueries({ queryKey: ["tenant-management"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel alterar o plano.")
+  });
+  const inviteMutation = useMutation({
+    mutationFn: (tenantUserId: string) => tenantManagementService.createInviteLink(id, tenantUserId),
+    onSuccess: async (invite) => {
+      await navigator.clipboard.writeText(invite.acceptUrl);
+      toast.success("Novo link de convite copiado.");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel gerar o convite.")
   });
 
   const handleStatusSubmit = async (event: FormEvent) => {
@@ -56,6 +80,10 @@ export function SuperAdminTenantDetail() {
 
   const handlePlanSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!planId) {
+      toast.warning("Selecione um plano ativo antes de atualizar.");
+      return;
+    }
     await planMutation.mutateAsync();
   };
 
@@ -151,11 +179,12 @@ export function SuperAdminTenantDetail() {
             <label className="field">
               <span>Novo plano</span>
               <div>
-                <select onChange={(event) => setPlanName(event.target.value as PlanName)} value={planName}>
-                  <option value="TRIAL">Trial</option>
-                  <option value="BASIC">Basic</option>
-                  <option value="PRO">Pro</option>
-                  <option value="ENTERPRISE">Enterprise</option>
+                <select onChange={(event) => setPlanId(event.target.value)} value={planId}>
+                  {activePlans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} - {plan.price > 0 ? `R$ ${plan.price.toFixed(2)}` : "sob consulta"}
+                    </option>
+                  ))}
                 </select>
               </div>
             </label>
@@ -163,7 +192,7 @@ export function SuperAdminTenantDetail() {
               <span>Observacao</span>
               <textarea onChange={(event) => setPlanReason(event.target.value)} value={planReason} />
             </label>
-            <button className="primary-button" disabled={planMutation.isPending} type="submit">
+            <button className="primary-button" disabled={planMutation.isPending || !planId} type="submit">
               {planMutation.isPending ? <Loader2 className="spin" size={18} /> : <Save size={18} />}
               Atualizar plano
             </button>
@@ -185,6 +214,17 @@ export function SuperAdminTenantDetail() {
                   <span>{membership.user.email}</span>
                 </div>
                 <StatusBadge status={membership.status} />
+                {membership.status !== "ACTIVE" ? (
+                  <button
+                    aria-label="Gerar link de convite"
+                    className="ghost-icon-button"
+                    disabled={inviteMutation.isPending}
+                    onClick={() => inviteMutation.mutate(membership.id)}
+                    type="button"
+                  >
+                    <Copy size={16} /> Link
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>

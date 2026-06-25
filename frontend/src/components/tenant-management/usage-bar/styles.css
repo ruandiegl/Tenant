@@ -23,7 +23,7 @@
 
 .usage-bar strong {
   color: var(--brand-dark);
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .usage-bar meter {

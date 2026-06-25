@@ -14,5 +14,8 @@
 }
 
 .stat-card strong {
+  font-family: var(--font-data);
   font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: 0;
 }

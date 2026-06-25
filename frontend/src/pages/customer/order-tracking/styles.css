@@ -22,7 +22,8 @@
 .tracking-estimate span {
   color: var(--brand-dark);
   font-size: 1.5rem;
-  font-weight: 900;
+  font-family: var(--font-data);
+  font-weight: 800;
 }
 
 .tracking-estimate small {

@@ -8,6 +8,7 @@ import { StatusBadge } from "../../../components/ui/status-badge";
 import { ordersService } from "../../../services/orders";
 import { OrderStatus } from "../../../types/database";
 import { formatCurrency, formatTime, minutesUntil } from "../../../utils/format";
+import { DEFAULT_PUBLIC_TENANT_SLUG, publicTenantPath } from "../../../utils/public-tenant-route";
 
 const trackingSteps: Array<{ status: OrderStatus; label: string; description: string }> = [
   { status: "PLACED", label: "Recebido", description: "Seu pedido chegou para a loja." },
@@ -24,7 +25,7 @@ function normalizeStatus(status: OrderStatus) {
 }
 
 export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?: string }) {
-  const { publicCode: publicCodeParam = "" } = useParams();
+  const { tenantSlug = DEFAULT_PUBLIC_TENANT_SLUG, publicCode: publicCodeParam = "" } = useParams();
   const publicCode = publicCodeParam || publicCodeFallback;
   const socket = useSocket();
   const {
@@ -35,8 +36,8 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
     isFetching
   } = useQuery({
     enabled: Boolean(publicCode),
-    queryKey: ["order", publicCode],
-    queryFn: () => ordersService.getByPublicCode(publicCode),
+    queryKey: ["order", tenantSlug, publicCode],
+    queryFn: () => ordersService.getByPublicCode(publicCode, tenantSlug),
     refetchInterval: 12_000
   });
 
@@ -64,7 +65,7 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
           <ReceiptText size={28} />
           <strong>Nenhum pedido em andamento</strong>
           <span>Quando voce finalizar um pedido, o acompanhamento aparece aqui automaticamente.</span>
-          <Link className="wide-link" to="/cliente/menu">
+          <Link className="wide-link" to={publicTenantPath(tenantSlug, "/menu")}>
             <ShoppingBag size={18} /> Ver menu
           </Link>
         </article>
@@ -163,7 +164,7 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
             </article>
           </div>
 
-          <Link className="wide-link" to="/cliente/menu">
+          <Link className="wide-link" to={publicTenantPath(tenantSlug, "/menu")}>
             <ReceiptText size={18} /> Voltar ao menu
           </Link>
         </>

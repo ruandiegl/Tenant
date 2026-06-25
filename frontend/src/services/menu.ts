@@ -1,8 +1,7 @@
 import { MenuCategory, Product, ProductAvailability, ProductTemplate } from "../types/database";
 import { ImageUpload } from "../utils/image-upload";
 import { api, getApiBaseUrl, protectedApi } from "./api";
-
-const TENANT_SLUG = import.meta.env.VITE_DEMO_TENANT_SLUG ?? "demo-burger";
+import { DEFAULT_PUBLIC_TENANT_SLUG } from "../utils/public-tenant-route";
 
 type BackendOptionGroup = Omit<Product["optionGroups"][number], "items"> & {
   options?: Product["optionGroups"][number]["items"];
@@ -153,8 +152,8 @@ function mapTemplate(template: ProductTemplate): ProductTemplate {
 }
 
 export const menuService = {
-  getPublicMenu: async () => {
-    return flattenPublicMenu(await api<PublicMenuResponse>(`/public/${TENANT_SLUG}/menu`));
+  getPublicMenu: async (tenantSlug = DEFAULT_PUBLIC_TENANT_SLUG) => {
+    return flattenPublicMenu(await api<PublicMenuResponse>(`/public/${tenantSlug}/menu`));
   },
   getAdminMenu: async () => {
     const [categories, products] = await Promise.all([

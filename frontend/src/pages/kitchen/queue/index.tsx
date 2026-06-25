@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import { useTenant } from "../../../app/providers/tenant-provider";
 import { useSocket } from "../../../app/providers/socket-provider";
 import { PeriodFilter } from "../../../components/filters/period-filter";
 import { PageHeader } from "../../../components/ui/page-header";
@@ -65,6 +66,7 @@ const previousStatus: Partial<Record<OrderStatus, { label: string; status: Order
 };
 
 export function KitchenQueue() {
+  const { tenant } = useTenant();
   const socket = useSocket();
   const queryClient = useQueryClient();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(() => new Set());
@@ -74,7 +76,7 @@ export function KitchenQueue() {
   const [customEndDate, setCustomEndDate] = useState(() => toDateInputValue(new Date()));
   const range = useMemo(() => getPeriodRange(period, customStartDate, customEndDate), [customEndDate, customStartDate, period]);
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ["kitchen-orders", range.from, range.to],
+    queryKey: ["kitchen-orders", tenant.id, range.from, range.to],
     queryFn: () => ordersService.list(range),
     refetchInterval: 5000,
     refetchOnMount: "always",
@@ -83,18 +85,18 @@ export function KitchenQueue() {
   });
   const { data: selectedOrder, isFetching: isFetchingDetails } = useQuery({
     enabled: Boolean(selectedOrderId),
-    queryKey: ["order-details", selectedOrderId],
+    queryKey: ["order-details", tenant.id, selectedOrderId],
     queryFn: () => ordersService.get(selectedOrderId!)
   });
   const updateStatus = useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: OrderStatus }) => ordersService.updateStatus(orderId, status),
     onSuccess: (order) => {
       toast.info(`Pedido #${order.publicCode} movido para ${order.status}.`);
-      void queryClient.invalidateQueries({ queryKey: ["kitchen-orders"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-summary"], refetchType: "all" });
+      void queryClient.invalidateQueries({ queryKey: ["kitchen-orders", tenant.id] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-orders", tenant.id] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-summary", tenant.id], refetchType: "all" });
       if (selectedOrderId) {
-        void queryClient.invalidateQueries({ queryKey: ["order-details", selectedOrderId] });
+        void queryClient.invalidateQueries({ queryKey: ["order-details", tenant.id, selectedOrderId] });
       }
     },
     onError: () => {

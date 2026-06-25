@@ -7,7 +7,8 @@ import { useAuth } from "../../../app/providers/auth-provider";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, login } = useAuth();
+  const { can, isAuthenticated, login } = useAuth();
+  const [accessMode, setAccessMode] = useState<"tenant" | "platform">("tenant");
   const [email, setEmail] = useState(import.meta.env.VITE_DEMO_EMAIL ?? "admin@demo.local");
   const [password, setPassword] = useState(import.meta.env.VITE_DEMO_PASSWORD ?? "admin123");
   const [tenantSlug, setTenantSlug] = useState(import.meta.env.VITE_DEMO_TENANT_SLUG ?? "demo-burger");
@@ -16,7 +17,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   if (isAuthenticated) {
-    return <Navigate to="/admin" replace />;
+    return <Navigate to={can("platform.tenants.read") ? "/superadmin" : "/admin"} replace />;
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -25,10 +26,10 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login({ email, password, tenantSlug });
-      navigate("/admin", { replace: true });
+      const user = await login({ email, password, tenantSlug: accessMode === "tenant" ? tenantSlug : undefined });
+      navigate(user.permissions.includes("platform.tenants.read") ? "/superadmin" : "/admin", { replace: true });
     } catch {
-      setError("Nao foi possivel entrar. Confira email, senha e tenant.");
+      setError(accessMode === "tenant" ? "Nao foi possivel entrar. Confira email, senha e tenant." : "Nao foi possivel entrar como superadmin.");
     } finally {
       setIsSubmitting(false);
     }
@@ -59,7 +60,16 @@ export function LoginPage() {
           <div className="auth-panel-heading">
             <span className="eyebrow">Acesso</span>
             <h2>Entrar no painel</h2>
-            <p>Use suas credenciais do tenant.</p>
+            <p>{accessMode === "tenant" ? "Use suas credenciais do tenant." : "Acesso restrito a operadores PodePedir."}</p>
+          </div>
+
+          <div className="auth-mode-switch" aria-label="Tipo de acesso">
+            <button className={accessMode === "tenant" ? "active" : ""} onClick={() => setAccessMode("tenant")} type="button">
+              <Store size={16} /> Restaurante
+            </button>
+            <button className={accessMode === "platform" ? "active" : ""} onClick={() => setAccessMode("platform")} type="button">
+              <ShieldCheck size={16} /> Plataforma
+            </button>
           </div>
 
           <label className="field auth-field">
@@ -91,13 +101,15 @@ export function LoginPage() {
             </div>
           </label>
 
-          <label className="field auth-field">
-            <span>Tenant</span>
-            <div>
-              <Store size={18} />
-              <input value={tenantSlug} onChange={(event) => setTenantSlug(event.target.value)} autoComplete="organization" />
-            </div>
-          </label>
+          {accessMode === "tenant" ? (
+            <label className="field auth-field">
+              <span>Tenant</span>
+              <div>
+                <Store size={18} />
+                <input value={tenantSlug} onChange={(event) => setTenantSlug(event.target.value)} autoComplete="organization" />
+              </div>
+            </label>
+          ) : null}
 
           {error && <p className="form-error">{error}</p>}
 

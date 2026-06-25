@@ -4,10 +4,17 @@
   border-radius: 999px;
   color: var(--brand-dark);
   display: inline-flex;
-  font-size: 0.75rem;
-  font-weight: 850;
-  min-height: 28px;
-  padding: 0 10px;
+  flex: 0 0 auto;
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  font-weight: 800;
+  height: 28px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 54px;
+  padding: 0 12px;
+  text-align: center;
+  vertical-align: middle;
   white-space: nowrap;
 }
 

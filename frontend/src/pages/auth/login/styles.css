@@ -4,7 +4,7 @@
     radial-gradient(circle at 28% 28%, rgba(39, 174, 81, 0.1), transparent 30%),
     linear-gradient(135deg, #071318 0%, #0a1c16 52%, #10251b 100%);
   display: grid;
-  font-family: "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-admin);
   min-height: 100vh;
   overflow: hidden;
   padding: 18px;
@@ -81,7 +81,7 @@
 
 .auth-brand-lockup strong {
   font-size: 1rem;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .auth-hero-copy {
@@ -93,7 +93,7 @@
 
 .auth-hero-copy h1 {
   font-size: clamp(1.9rem, 5.8vw, 3.25rem);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.04;
   margin: 0;
   max-width: 560px;
@@ -132,7 +132,7 @@
 .auth-panel-heading h2 {
   color: #071318;
   font-size: clamp(1.65rem, 5vw, 2.08rem);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.08;
   margin: 0;
 }
@@ -148,9 +148,38 @@
 .auth-field > span {
   color: #81908a;
   font-size: 0.7rem;
-  font-weight: 850;
+  font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.auth-mode-switch {
+  background: #edf3ee;
+  border: 1px solid #dce4df;
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 4px;
+}
+
+.auth-mode-switch button {
+  align-items: center;
+  background: transparent;
+  border-radius: 8px;
+  color: #65746e;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 7px;
+  justify-content: center;
+  min-height: 38px;
+}
+
+.auth-mode-switch button.active {
+  background: #ffffff;
+  color: #10251b;
+  box-shadow: 0 8px 18px rgba(26, 45, 39, 0.08);
 }
 
 .auth-field > div {

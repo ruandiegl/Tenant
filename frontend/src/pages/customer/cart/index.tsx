@@ -1,17 +1,22 @@
 import "./styles.css";
 import { FormEvent, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Bike, ChevronLeft, CreditCard, Minus, Plus, ReceiptText, Trash2, UserRound, WalletCards } from "lucide-react";
 import { toast } from "react-toastify";
 import { useCustomerFlow } from "../../../app/providers/customer-flow-provider";
+import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { formatCurrency, formatTime } from "../../../utils/format";
+import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../../../utils/public-tenant-route";
 
 type CheckoutStep = "cart" | "address" | "payment" | "done";
 
 export function CustomerCart({ step }: { step: CheckoutStep }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const tenantSlug = getPublicTenantSlug(location.pathname) ?? DEFAULT_PUBLIC_TENANT_SLUG;
+  const tenantPath = (path: string) => publicTenantPath(tenantSlug, path);
   const {
     items,
     address,
@@ -34,6 +39,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
   } = useCustomerFlow();
   const [error, setError] = useState<string | null>(null);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [cartItemPendingDelete, setCartItemPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const missingAddress = useMemo(
     () => !address.street || !address.number || !address.district || !address.postalCode,
@@ -62,14 +68,14 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
         return;
       }
 
-      navigate("/cliente/carrinho/endereco");
+      navigate(tenantPath("/carrinho/endereco"));
       return;
     }
 
     if (step === "address") {
       if (items.length === 0) {
         toast.info("Escolha pelo menos um item antes de continuar.");
-        navigate("/cliente/carrinho");
+        navigate(tenantPath("/carrinho"));
         return;
       }
 
@@ -79,7 +85,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
         return;
       }
 
-      navigate("/cliente/carrinho/pagamento");
+      navigate(tenantPath("/carrinho/pagamento"));
       return;
     }
   };
@@ -90,21 +96,21 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
 
     if (items.length === 0) {
       toast.info("Escolha pelo menos um item antes de finalizar.");
-      navigate("/cliente/carrinho");
+      navigate(tenantPath("/carrinho"));
       return;
     }
 
     if (!profile.name || profile.name.trim().length < 2) {
       setError("Informe o nome para contato antes de confirmar.");
       toast.warning("Informe o nome para contato antes de confirmar.");
-      navigate("/cliente/carrinho/endereco");
+      navigate(tenantPath("/carrinho/endereco"));
       return;
     }
 
     if (missingAddress) {
       setError("Preencha rua, numero, bairro e CEP para salvar o pedido.");
       toast.warning("Preencha rua, numero, bairro e CEP para salvar o pedido.");
-      navigate("/cliente/carrinho/endereco");
+      navigate(tenantPath("/carrinho/endereco"));
       return;
     }
 
@@ -119,7 +125,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
     try {
       const created = await placeOrder();
       toast.success(`Pedido #${created.publicCode} confirmado.`);
-      navigate("/cliente/carrinho/confirmacao");
+      navigate(tenantPath("/carrinho/confirmacao"));
     } catch (orderError) {
       console.error(orderError);
       setError("Nao conseguimos confirmar seu pedido agora. Tente novamente em instantes.");
@@ -131,30 +137,37 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
 
   const handleNewOrder = () => {
     resetOrder();
-    navigate("/cliente/carrinho");
+    navigate(tenantPath("/carrinho"));
     setError(null);
     toast.info("Carrinho liberado para um novo pedido.");
+  };
+
+  const confirmRemoveCartItem = () => {
+    if (!cartItemPendingDelete) return;
+
+    removeItem(cartItemPendingDelete.id);
+    setCartItemPendingDelete(null);
   };
 
   const goBack = () => {
     setError(null);
 
     if (step === "address") {
-      navigate("/cliente/carrinho");
+      navigate(tenantPath("/carrinho"));
       return;
     }
 
     if (step === "payment") {
-      navigate("/cliente/carrinho/endereco");
+      navigate(tenantPath("/carrinho/endereco"));
       return;
     }
 
     if (step === "done") {
-      navigate("/cliente/pedido");
+      navigate(tenantPath("/pedido"));
       return;
     }
 
-    navigate("/cliente/menu");
+    navigate(tenantPath("/menu"));
   };
 
   return (
@@ -180,7 +193,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                 <ReceiptText size={26} />
                 <strong>Seu carrinho esta vazio</strong>
                 <span>Escolha produtos no menu para continuar.</span>
-                <Link className="wide-link" to="/cliente/menu">
+                <Link className="wide-link" to={tenantPath("/menu")}>
                   Ver menu
                 </Link>
               </div>
@@ -209,7 +222,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                     <button aria-label="Aumentar item" onClick={() => incrementItem(item.id)}>
                       <Plus size={16} />
                     </button>
-                    <button aria-label="Remover item" onClick={() => removeItem(item.id)}>
+                    <button aria-label="Remover item" onClick={() => setCartItemPendingDelete({ id: item.id, name: item.productName })}>
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -227,7 +240,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
           <ReceiptText size={26} />
           <strong>Seu carrinho esta vazio</strong>
           <span>Escolha produtos no menu antes de informar a entrega.</span>
-          <Link className="wide-link" to="/cliente/menu">
+          <Link className="wide-link" to={tenantPath("/menu")}>
             Ver menu
           </Link>
         </article>
@@ -314,7 +327,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
           <ReceiptText size={26} />
           <strong>Seu carrinho esta vazio</strong>
           <span>Escolha produtos no menu antes de finalizar o pedido.</span>
-          <Link className="wide-link" to="/cliente/menu">
+          <Link className="wide-link" to={tenantPath("/menu")}>
             Ver menu
           </Link>
         </article>
@@ -400,7 +413,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
           <ReceiptText size={26} />
           <strong>Nenhum pedido confirmado ainda</strong>
           <span>Finalize um pedido para ver a confirmacao por aqui.</span>
-          <Link className="wide-link" to="/cliente/menu">
+          <Link className="wide-link" to={tenantPath("/menu")}>
             Ver menu
           </Link>
         </article>
@@ -425,7 +438,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
             <button className="primary-button" onClick={handleNewOrder}>
               Fazer outro pedido
             </button>
-            <Link className="wide-link" to="/cliente/pedido">
+            <Link className="wide-link" to={tenantPath("/pedido")}>
               Acompanhar pedido
             </Link>
           </article>
@@ -435,7 +448,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
             <p className="muted-text">
               {address.street}, {address.number} - {address.district}
             </p>
-            <Link className="wide-link" to="/cliente/perfil">
+            <Link className="wide-link" to={tenantPath("/perfil")}>
               Salvar dados no perfil
             </Link>
           </article>
@@ -447,6 +460,15 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
           {step !== "payment" ? <button onClick={nextStep}>Continuar</button> : null}
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(cartItemPendingDelete)}
+        title="Remover item"
+        description={`Remover ${cartItemPendingDelete?.name ?? "este item"} do carrinho?`}
+        confirmLabel="Remover item"
+        onCancel={() => setCartItemPendingDelete(null)}
+        onConfirm={confirmRemoveCartItem}
+      />
     </section>
   );
 }

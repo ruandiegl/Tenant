@@ -148,6 +148,7 @@ model Tenant {
   id        String          @id @default(cuid())
   name      String
   slug      String          @unique
+  legalName String?
   document  String?         @unique
   email     String?
   phone     String?
@@ -155,6 +156,7 @@ model Tenant {
   planId    String?
   plan      Plan?           @relation(fields: [planId], references: [id])
   settings  TenantSettings?
+  invites   TenantInvite[]
   users     TenantUser[]
   roles     Role[]
   branches  Branch[]
@@ -172,8 +174,20 @@ model TenantSettings {
   tenantId               String   @unique
   tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   brandName              String?
+  legalName              String?
+  description            String?
+  slogan                 String?
+  businessType           String?
+  cuisineCategory        String?
+  websiteUrl             String?
+  instagramUrl           String?
+  whatsapp               String?
   logoUrl                String?
+  coverImageUrl          String?
   primaryColor           String?
+  secondaryColor         String?
+  themeFontFamily        String?
+  welcomeMessage         String?
   timezone               String   @default("America/Sao_Paulo")
   currency               String   @default("BRL")
   allowGuestCheckout     Boolean  @default(true)
@@ -182,6 +196,23 @@ model TenantSettings {
   minimumOrderValue      Decimal  @default(0) @db.Decimal(12, 2)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
+}
+
+model TenantInvite {
+  id              String     @id @default(cuid())
+  tenantId        String
+  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email           String
+  role            String
+  tokenHash       String     @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdByUserId String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([tenantId, email])
+  @@index([tokenHash])
 }
 
 model User {
@@ -193,6 +224,7 @@ model User {
   phone          String?
   avatarUrl      String?
   status         UserStatus    @default(ACTIVE)
+  isPlatformAdmin Boolean      @default(false)
   lastLoginAt    DateTime?
   tenantUsers    TenantUser[]
   sessions       UserSession[]

@@ -41,7 +41,8 @@
   color: var(--text);
   display: inline-flex;
   flex: 0 0 auto;
-  font-weight: 850;
+  font-family: var(--font-customer);
+  font-weight: 700;
   gap: 8px;
   justify-content: center;
   min-height: 42px;
@@ -58,14 +59,14 @@
 }
 
 .checkout-actions {
-  bottom: 82px;
+  justify-self: stretch;
   justify-content: flex-end;
-  position: sticky;
-  z-index: 10;
+  overflow: visible;
+  scroll-snap-type: none;
 }
 
 .checkout-actions button {
-  min-width: min(180px, 100%);
+  width: 100%;
 }
 
 .cart-item-card {
@@ -97,6 +98,12 @@
 
 .cart-item-card span {
   color: var(--muted);
+}
+
+.cart-item-card strong {
+  font-family: var(--font-customer);
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .cart-item-card textarea {
@@ -134,12 +141,13 @@
   background: var(--surface-strong);
   border-radius: 8px;
   display: inline-flex;
+  font-family: var(--font-data);
+  font-weight: 800;
   justify-content: center;
 }
 
 .total-panel {
-  position: sticky;
-  bottom: 86px;
+  align-self: start;
 }
 
 .total-panel > div {
@@ -153,6 +161,13 @@
   border-top: 1px solid var(--line);
   font-size: 1.1rem;
   padding-top: 12px;
+}
+
+.total-panel strong,
+.grand-total strong {
+  font-family: var(--font-data);
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .timeline {
@@ -187,6 +202,11 @@
   .checkout-grid {
     gap: 14px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .checkout-actions button {
+    max-width: 220px;
+    width: auto;
   }
 
   .cart-item-card {

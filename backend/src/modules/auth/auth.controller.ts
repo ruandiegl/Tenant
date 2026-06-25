@@ -10,9 +10,36 @@ export const login: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const invite: RequestHandler = async (req, res, next) => {
+  try {
+    const result = await authService.getInvite(req.params.token);
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const acceptInvite: RequestHandler = async (req, res, next) => {
+  try {
+    const result = await authService.acceptInvite(req.body);
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const me: RequestHandler = async (req, res, next) => {
   try {
     const result = await authService.getMe(req.auth!.userId, req.auth?.tenantId);
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateProfile: RequestHandler = async (req, res, next) => {
+  try {
+    const result = await authService.updateProfile(req.auth!.userId, req.body);
     return res.json(result);
   } catch (error) {
     return next(error);

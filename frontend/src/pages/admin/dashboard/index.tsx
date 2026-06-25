@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ClipboardList, Settings2 } from "lucide-react";
+import { useTenant } from "../../../app/providers/tenant-provider";
 import { PeriodFilter } from "../../../components/filters/period-filter";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatCard } from "../../../components/ui/stat-card";
@@ -33,12 +34,13 @@ function typeLabel(type: string) {
 }
 
 export function AdminDashboard() {
+  const { tenant } = useTenant();
   const [period, setPeriod] = useState<PeriodFilterValue>("today");
   const [customStartDate, setCustomStartDate] = useState(() => toDateInputValue(addDays(new Date(), -6)));
   const [customEndDate, setCustomEndDate] = useState(() => toDateInputValue(new Date()));
   const range = useMemo(() => getPeriodRange(period, customStartDate, customEndDate), [customEndDate, customStartDate, period]);
   const { data: summary } = useQuery({
-    queryKey: ["admin-summary", range.from, range.to],
+    queryKey: ["admin-summary", tenant.id, range.from, range.to],
     queryFn: () => adminService.getSummary(range),
     refetchInterval: 5000,
     refetchOnMount: "always",

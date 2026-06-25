@@ -5,4 +5,5 @@ export type RequestAuth = {
   role?: string;
   permissions: string[];
   branchId?: string;
+  isPlatformAdmin?: boolean;
 };

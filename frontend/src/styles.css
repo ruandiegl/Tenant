@@ -1,10 +1,16 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&family=Nunito:wght@400;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap");
+
 :root {
   color: #16201d;
   background: #f6f7f4;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-admin);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  --font-admin: "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-customer: "DM Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-data: Inter, "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-friendly: Nunito, "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --bg: #f6f8f4;
   --surface: #ffffff;
   --surface-strong: #edf6ef;
@@ -25,6 +31,7 @@
 }
 
 body {
+  font-family: var(--font-admin);
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
@@ -93,6 +100,38 @@ img {
   padding: 0;
 }
 
+.admin-shell-active,
+.admin-layout,
+.superadmin-layout,
+.login-page,
+.invite-page {
+  font-family: var(--font-admin);
+}
+
+.customer-screen,
+.customer-nav,
+.product-card,
+.checkout-grid,
+.tracking-summary {
+  font-family: var(--font-customer);
+}
+
+.stat-card,
+.status-badge,
+.plan-badge,
+.tms-table-head,
+.tms-table-row,
+.usage-bar,
+.order-totals-grid,
+.total-panel {
+  font-family: var(--font-data);
+}
+
+.code {
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
 .screen {
   display: grid;
   gap: 18px;
@@ -148,6 +187,7 @@ img {
 
 .eyebrow {
   color: var(--brand);
+  font-family: var(--font-data);
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -239,6 +279,7 @@ img {
   border-radius: 8px;
   color: white;
   display: inline-flex;
+  font-family: inherit;
   font-weight: 800;
   gap: 8px;
   justify-content: center;
@@ -378,7 +419,7 @@ img {
   border-radius: 8px;
   color: var(--brand-dark);
   display: inline-flex;
-  font-weight: 850;
+  font-weight: 800;
   gap: 7px;
   justify-content: center;
   min-height: 38px;

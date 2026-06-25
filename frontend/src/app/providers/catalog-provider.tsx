@@ -1,7 +1,9 @@
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { menuService } from "../../services/menu";
 import { MenuCategory, Product, ProductAvailability, ProductStatus } from "../../types/database";
 import { ImageUpload } from "../../utils/image-upload";
+import { getPublicTenantSlug } from "../../utils/public-tenant-route";
 
 export type CategoryDraft = {
   name: string;
@@ -124,6 +126,8 @@ function toProductPayload(draft: ProductDraft) {
 }
 
 export function CatalogProvider({ children }: PropsWithChildren) {
+  const location = useLocation();
+  const publicTenantSlug = getPublicTenantSlug(location.pathname);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productAvailability, setProductAvailability] = useState<ProductAvailability[]>([]);
@@ -141,13 +145,20 @@ export function CatalogProvider({ children }: PropsWithChildren) {
     setError(null);
 
     try {
-      applyCatalog(await menuService.getPublicMenu());
+      if (!publicTenantSlug) {
+        setCategories([]);
+        setProducts([]);
+        setProductAvailability([]);
+        return;
+      }
+
+      applyCatalog(await menuService.getPublicMenu(publicTenantSlug));
     } catch {
       setError("Nao foi possivel carregar o cardapio.");
     } finally {
       setLoading(false);
     }
-  }, [applyCatalog]);
+  }, [applyCatalog, publicTenantSlug]);
 
   const refreshAdminCatalog = useCallback(async () => {
     setLoading(true);

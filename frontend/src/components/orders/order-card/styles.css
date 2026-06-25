@@ -9,7 +9,10 @@
 }
 
 .order-card h3 {
+  font-family: var(--font-admin);
   font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0;
   margin: 0;
 }
 
@@ -24,7 +27,7 @@
   color: var(--brand);
   display: block;
   font-size: 0.77rem;
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .meta-grid {
@@ -71,6 +74,8 @@
 
 .order-card footer strong {
   color: var(--text);
+  font-family: var(--font-data);
+  font-weight: 800;
 }
 
 .order-status-actions {
@@ -85,7 +90,8 @@
   border-radius: 8px;
   color: var(--brand-dark);
   cursor: pointer;
-  font-weight: 850;
+  font-family: var(--font-admin);
+  font-weight: 800;
   min-height: 38px;
   padding: 0 14px;
 }

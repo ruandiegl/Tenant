@@ -35,6 +35,7 @@ export type BaseEntity = {
 export type Tenant = BaseEntity & {
   name: string;
   slug: string;
+  legalName?: string;
   document?: string;
   email: string;
   phone: string;
@@ -46,8 +47,20 @@ export type Tenant = BaseEntity & {
 export type TenantSettings = {
   tenantId: string;
   brandName: string;
+  legalName?: string;
+  description?: string;
+  slogan?: string;
+  businessType?: string;
+  cuisineCategory?: string;
+  websiteUrl?: string;
+  instagramUrl?: string;
+  whatsapp?: string;
   logoUrl: string;
+  coverImageUrl?: string;
   primaryColor: string;
+  secondaryColor?: string;
+  themeFontFamily?: string;
+  welcomeMessage?: string;
   timezone: string;
   currency: string;
   allowGuestCheckout: boolean;
@@ -91,8 +104,28 @@ export type TenantUser = BaseEntity & {
   status: UserStatus;
   name: string;
   email: string;
+  phone?: string | null;
   roleName: string;
   permissions: string[];
+  plan?: {
+    id: string;
+    name: string;
+    capabilities: PlanCapabilities;
+  } | null;
+  isPlatformAdmin?: boolean;
+};
+
+export type PlanCapabilities = {
+  onlineOrders: boolean;
+  menuBuilder: boolean;
+  kitchen: boolean;
+  coupons: boolean;
+  reports: boolean;
+  stockControl: boolean;
+  customBranding: boolean;
+  multiBranch: boolean;
+  apiAccess: boolean;
+  prioritySupport: boolean;
 };
 
 export type Customer = BaseEntity & {

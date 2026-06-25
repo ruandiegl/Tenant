@@ -35,9 +35,24 @@ export const authMiddleware: RequestHandler = async (req, _res, next) => {
       throw new AppError("Invalid authenticated user", 401);
     }
 
+    if (!payload.tenantId && payload.isPlatformAdmin && user.isPlatformAdmin) {
+      req.auth = {
+        userId: user.id,
+        role: "superadmin",
+        permissions: payload.permissions,
+        isPlatformAdmin: true
+      };
+
+      return next();
+    }
+
     const membership = payload.tenantId
       ? user.tenantUsers.find((item) => item.tenantId === payload.tenantId && item.status === "ACTIVE")
       : user.tenantUsers.find((item) => item.status === "ACTIVE");
+
+    if (!membership) {
+      throw new AppError("User does not have an active tenant membership", 403);
+    }
 
     req.auth = {
       userId: user.id,
@@ -45,7 +60,8 @@ export const authMiddleware: RequestHandler = async (req, _res, next) => {
       tenantUserId: membership?.id,
       role: membership?.role.name,
       branchId: membership?.branchId ?? undefined,
-      permissions: membership?.role.permissions.map((item) => item.permission.key) ?? payload.permissions ?? []
+      permissions: membership.role.permissions.map((item) => item.permission.key) ?? payload.permissions ?? [],
+      isPlatformAdmin: false
     };
 
     return next();
@@ -65,3 +81,11 @@ export const requirePermission =
 
     return next();
   };
+
+export const requirePlatformAdmin: RequestHandler = (req, _res, next) => {
+  if (!req.auth?.isPlatformAdmin) {
+    return next(new AppError("Platform admin access required", 403));
+  }
+
+  return next();
+};

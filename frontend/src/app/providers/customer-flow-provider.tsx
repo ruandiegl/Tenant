@@ -1,7 +1,9 @@
-import { createContext, PropsWithChildren, useContext, useMemo, useState } from "react";
+import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useCatalog } from "./catalog-provider";
 import { ordersService } from "../../services/orders";
 import { Product } from "../../types/database";
+import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug } from "../../utils/public-tenant-route";
 
 export type CustomerSelectedOption = {
   optionItemId: string;
@@ -123,12 +125,19 @@ function createCartItem(product: Product, options: CustomerSelectedOption[] = []
 }
 
 export function CustomerFlowProvider({ children }: PropsWithChildren) {
+  const location = useLocation();
+  const publicTenantSlug = getPublicTenantSlug(location.pathname) ?? DEFAULT_PUBLIC_TENANT_SLUG;
   const { decrementStock } = useCatalog();
   const [items, setItems] = useState<CustomerCartItem[]>([]);
   const [address, setAddress] = useState<CustomerAddressDraft>(emptyAddress);
   const [payment, setPayment] = useState<CustomerPaymentDraft>(emptyPayment);
   const [profile, setProfile] = useState<CustomerProfileDraft>(emptyProfile);
   const [order, setOrder] = useState<PlacedCustomerOrder | null>(null);
+
+  useEffect(() => {
+    setItems([]);
+    setOrder(null);
+  }, [publicTenantSlug]);
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -195,33 +204,36 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
         setProfile((current) => ({ ...current, ...nextProfile }));
       },
       placeOrder: async () => {
-        const createdOrder = await ordersService.createPublicOrder({
-          type: "DELIVERY",
-          customerName: profile.name,
-          customerPhone: profile.phone || undefined,
-          customerEmail: profile.email || undefined,
-          deliveryFee: totals.deliveryFee,
-          notes: `Pagamento selecionado: ${payment.type}`,
-          deliveryAddress: {
-            street: address.street,
-            number: address.number,
-            complement: address.complement || undefined,
-            district: address.district,
-            city: address.city,
-            state: address.state,
-            postalCode: address.postalCode,
-            reference: address.reference || undefined
-          },
-          items: items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            notes: item.notes || undefined,
-            options: item.options.map((option) => ({
-              optionItemId: option.optionItemId,
-              quantity: option.quantity
+        const createdOrder = await ordersService.createPublicOrder(
+          {
+            type: "DELIVERY",
+            customerName: profile.name,
+            customerPhone: profile.phone || undefined,
+            customerEmail: profile.email || undefined,
+            deliveryFee: totals.deliveryFee,
+            notes: `Pagamento selecionado: ${payment.type}`,
+            deliveryAddress: {
+              street: address.street,
+              number: address.number,
+              complement: address.complement || undefined,
+              district: address.district,
+              city: address.city,
+              state: address.state,
+              postalCode: address.postalCode,
+              reference: address.reference || undefined
+            },
+            items: items.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              notes: item.notes || undefined,
+              options: item.options.map((option) => ({
+                optionItemId: option.optionItemId,
+                quantity: option.quantity
+              }))
             }))
-          }))
-        });
+          },
+          publicTenantSlug
+        );
 
         const nextOrder: PlacedCustomerOrder = {
           publicCode: createdOrder.publicCode,
@@ -241,7 +253,7 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
         setOrder(null);
       }
     }),
-    [address, decrementStock, items, order, payment, profile, totals]
+    [address, decrementStock, items, order, payment, profile, publicTenantSlug, totals]
   );
 
   return <CustomerFlowContext.Provider value={value}>{children}</CustomerFlowContext.Provider>;

@@ -1,5 +1,5 @@
 import "./styles.css";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { useCatalog } from "../../../app/providers/catalog-provider";
@@ -10,8 +10,11 @@ import { PageHeader } from "../../../components/ui/page-header";
 import { Product } from "../../../types/database";
 import { formatCurrency } from "../../../utils/format";
 import { useState } from "react";
+import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../../../utils/public-tenant-route";
 
 export function CustomerMenu() {
+  const location = useLocation();
+  const tenantSlug = getPublicTenantSlug(location.pathname) ?? DEFAULT_PUBLIC_TENANT_SLUG;
   const { settings } = useTenant();
   const { addProduct, items } = useCustomerFlow();
   const { publicCategories, publicProducts, getProductStock, loading, error } = useCatalog();
@@ -81,7 +84,7 @@ export function CustomerMenu() {
 
   return (
     <section className="screen customer-screen">
-      <div className="brand-hero" style={{ backgroundImage: `url(${settings.logoUrl})` }}>
+      <div className="brand-hero" style={{ backgroundImage: `url(${settings.coverImageUrl || settings.logoUrl})` }}>
         <div>
           <span>Aberto para entrega e retirada</span>
           <h1>{settings.brandName}</h1>
@@ -94,7 +97,7 @@ export function CustomerMenu() {
         title="Escolha seu pedido"
         description={`Pedido minimo ${settings.currency} ${settings.minimumOrderValue.toFixed(2)}`}
         actions={
-          <Link className="pill-button" to="/cliente/carrinho">
+          <Link className="pill-button" to={publicTenantPath(tenantSlug, "/carrinho")}>
             <ShoppingCart size={17} /> Carrinho {cartQuantity > 0 ? `(${cartQuantity})` : ""}
           </Link>
         }

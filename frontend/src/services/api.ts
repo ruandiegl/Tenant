@@ -5,11 +5,12 @@ const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD ?? "admin123";
 
 type LoginResponse = {
   token: string;
-  tenant: {
+  tenant?: {
     id: string;
     name: string;
     slug: string;
   };
+  isPlatformAdmin?: boolean;
 };
 
 let tokenMemory: string | null = window.localStorage.getItem("podepedir.token");
@@ -27,11 +28,16 @@ export function getTenantId() {
   return tenantIdMemory;
 }
 
-export function setSession(token: string, tenantId: string) {
+export function setSession(token: string, tenantId?: string | null) {
   tokenMemory = token;
-  tenantIdMemory = tenantId;
+  tenantIdMemory = tenantId ?? null;
   window.localStorage.setItem("podepedir.token", token);
-  window.localStorage.setItem("podepedir.tenantId", tenantId);
+
+  if (tenantId) {
+    window.localStorage.setItem("podepedir.tenantId", tenantId);
+  } else {
+    window.localStorage.removeItem("podepedir.tenantId");
+  }
 }
 
 export function clearSession() {
@@ -41,14 +47,18 @@ export function clearSession() {
   window.localStorage.removeItem("podepedir.tenantId");
 }
 
-export async function loginRequest(credentials?: { email: string; password: string; tenantSlug: string }) {
+export async function loginRequest(credentials?: { email: string; password: string; tenantSlug?: string }) {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       email: credentials?.email ?? DEMO_EMAIL,
       password: credentials?.password ?? DEMO_PASSWORD,
-      tenantSlug: credentials?.tenantSlug ?? DEMO_TENANT_SLUG
+      ...(credentials?.tenantSlug === undefined
+        ? credentials
+          ? {}
+          : { tenantSlug: DEMO_TENANT_SLUG }
+        : { tenantSlug: credentials.tenantSlug })
     })
   });
 
@@ -57,13 +67,13 @@ export async function loginRequest(credentials?: { email: string; password: stri
   }
 
   const data = (await response.json()) as LoginResponse;
-  setSession(data.token, data.tenant.id);
+  setSession(data.token, data.tenant?.id);
 
   return data;
 }
 
 export async function ensureSession() {
-  if (tokenMemory && tenantIdMemory) {
+  if (tokenMemory) {
     return { token: tokenMemory, tenantId: tenantIdMemory };
   }
 
@@ -98,6 +108,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(message);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
@@ -108,7 +122,7 @@ export async function protectedApi<T>(path: string, init?: RequestInit): Promise
     ...init,
     headers: {
       Authorization: `Bearer ${session.token}`,
-      "x-tenant-id": session.tenantId,
+      ...(session.tenantId ? { "x-tenant-id": session.tenantId } : {}),
       ...(init?.headers ?? {})
     }
   });

@@ -1,20 +1,22 @@
 import "./styles.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
+import { useTenant } from "../../../app/providers/tenant-provider";
 import { OrderCard } from "../../../components/orders/order-card";
 import { PageHeader } from "../../../components/ui/page-header";
 import { ordersService } from "../../../services/orders";
 import { OrderStatus } from "../../../types/database";
 
 export function AdminOrders() {
+  const { tenant } = useTenant();
   const queryClient = useQueryClient();
-  const { data: orders } = useQuery({ queryKey: ["admin-orders"], queryFn: () => ordersService.list() });
+  const { data: orders } = useQuery({ queryKey: ["admin-orders", tenant.id], queryFn: () => ordersService.list() });
   const updateStatus = useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: OrderStatus }) => ordersService.updateStatus(orderId, status),
     onSuccess: (order) => {
       toast.success(`Pedido #${order.publicCode} atualizado para ${order.status}.`);
-      void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-summary"], refetchType: "all" });
+      void queryClient.invalidateQueries({ queryKey: ["admin-orders", tenant.id] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-summary", tenant.id], refetchType: "all" });
     },
     onError: () => {
       toast.error("Nao foi possivel atualizar o status do pedido.");

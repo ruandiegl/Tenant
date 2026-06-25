@@ -18,6 +18,30 @@ export const plans: RequestHandler = async (_req, res, next) => {
   }
 };
 
+export const createPlan: RequestHandler = async (req, res, next) => {
+  try {
+    return res.status(201).json(await service.createPlan(req.body, actorFromRequest(req)));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updatePlanConfig: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.updatePlan(req.params.planId, req.body, actorFromRequest(req)));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const removePlan: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.deletePlan(req.params.planId, actorFromRequest(req)));
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const list: RequestHandler = async (req, res, next) => {
   try {
     return res.json(await service.listTenants(req.query as never));
@@ -50,6 +74,15 @@ export const update: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const remove: RequestHandler = async (req, res, next) => {
+  try {
+    await service.deleteTenant(req.params.id, actorFromRequest(req));
+    return res.status(204).send();
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const updateStatus: RequestHandler = async (req, res, next) => {
   try {
     return res.json(await service.updateTenantStatus(req.params.id, req.body.status, req.body.reason, actorFromRequest(req)));
@@ -63,6 +96,14 @@ export const updatePlan: RequestHandler = async (req, res, next) => {
     return res.json(
       await service.updateTenantPlan(req.params.id, req.body.planId, req.body.planName, req.body.reason, actorFromRequest(req))
     );
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const inviteLink: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.createInviteLink(req.params.id, req.params.tenantUserId, actorFromRequest(req)));
   } catch (error) {
     return next(error);
   }

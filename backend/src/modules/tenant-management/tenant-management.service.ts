@@ -1,15 +1,127 @@
-import { Prisma, type TenantStatus } from "@prisma/client";
+import { Prisma, type RecordStatus, type TenantStatus } from "@prisma/client";
+import crypto from "node:crypto";
+import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 
-const PLAN_LIMITS = {
-  TRIAL: { branches: 1, users: 2, products: 20, coupons: 2, label: "Trial" },
-  BASIC: { branches: 1, users: 5, products: 100, coupons: 10, label: "Basic" },
-  PRO: { branches: 5, users: 20, products: null, coupons: null, label: "Pro" },
-  ENTERPRISE: { branches: null, users: null, products: null, coupons: null, label: "Enterprise" }
+const DEFAULT_PLAN_DEFINITIONS = {
+  TRIAL: {
+    label: "Trial",
+    description: "Validacao inicial para novos restaurantes.",
+    price: 0,
+    maxBranches: 1,
+    maxUsers: 2,
+    features: {
+      limits: { products: 20, coupons: 2, ordersPerMonth: 100 },
+      capabilities: {
+        onlineOrders: true,
+        menuBuilder: true,
+        kitchen: true,
+        coupons: false,
+        reports: false,
+        stockControl: false,
+        customBranding: false,
+        multiBranch: false,
+        apiAccess: false,
+        prioritySupport: false
+      }
+    }
+  },
+  BASIC: {
+    label: "Basic",
+    description: "Operacao essencial para um restaurante.",
+    price: 99,
+    maxBranches: 1,
+    maxUsers: 5,
+    features: {
+      limits: { products: 100, coupons: 10, ordersPerMonth: 1000 },
+      capabilities: {
+        onlineOrders: true,
+        menuBuilder: true,
+        kitchen: true,
+        coupons: true,
+        reports: true,
+        stockControl: true,
+        customBranding: true,
+        multiBranch: false,
+        apiAccess: false,
+        prioritySupport: false
+      }
+    }
+  },
+  PRO: {
+    label: "Pro",
+    description: "Crescimento com filiais, cupons e relatorios.",
+    price: 249,
+    maxBranches: 5,
+    maxUsers: 20,
+    features: {
+      limits: { products: null, coupons: null, ordersPerMonth: 5000 },
+      capabilities: {
+        onlineOrders: true,
+        menuBuilder: true,
+        kitchen: true,
+        coupons: true,
+        reports: true,
+        stockControl: true,
+        customBranding: true,
+        multiBranch: true,
+        apiAccess: false,
+        prioritySupport: false
+      }
+    }
+  },
+  ENTERPRISE: {
+    label: "Enterprise",
+    description: "Operacao avancada para redes e contratos especiais.",
+    price: 0,
+    maxBranches: null,
+    maxUsers: null,
+    features: {
+      limits: { products: null, coupons: null, ordersPerMonth: null },
+      capabilities: {
+        onlineOrders: true,
+        menuBuilder: true,
+        kitchen: true,
+        coupons: true,
+        reports: true,
+        stockControl: true,
+        customBranding: true,
+        multiBranch: true,
+        apiAccess: true,
+        prioritySupport: true
+      }
+    }
+  }
 } as const;
 
-type PlanName = keyof typeof PLAN_LIMITS;
+type PlanName = keyof typeof DEFAULT_PLAN_DEFINITIONS;
+
+type PlanLimits = {
+  branches: number | null;
+  users: number | null;
+  products: number | null;
+  coupons: number | null;
+  ordersPerMonth: number | null;
+};
+
+type PlanCapabilities = {
+  onlineOrders: boolean;
+  menuBuilder: boolean;
+  kitchen: boolean;
+  coupons: boolean;
+  reports: boolean;
+  stockControl: boolean;
+  customBranding: boolean;
+  multiBranch: boolean;
+  apiAccess: boolean;
+  prioritySupport: boolean;
+};
+
+type PlanFeatures = {
+  limits: Omit<PlanLimits, "branches" | "users">;
+  capabilities: PlanCapabilities;
+};
 
 type Actor = {
   userId?: string;
@@ -28,6 +140,7 @@ type ListTenantsParams = {
 type TenantCreateInput = {
   name: string;
   slug: string;
+  legalName?: string;
   planId?: string;
   planName: PlanName;
   adminName?: string;
@@ -36,10 +149,37 @@ type TenantCreateInput = {
   email?: string;
   phone?: string;
   status: TenantStatus;
+  branch?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    address: {
+      street: string;
+      number: string;
+      complement?: string;
+      district: string;
+      city: string;
+      state: string;
+      postalCode: string;
+      reference?: string;
+    };
+  };
   settings?: {
     brandName?: string;
+    legalName?: string;
+    description?: string;
+    slogan?: string;
+    businessType?: string;
+    cuisineCategory?: string;
+    websiteUrl?: string;
+    instagramUrl?: string;
+    whatsapp?: string;
     logoUrl?: string;
+    coverImageUrl?: string;
     primaryColor?: string;
+    secondaryColor?: string;
+    themeFontFamily?: string;
+    welcomeMessage?: string;
     allowGuestCheckout?: boolean;
     autoAcceptOrders?: boolean;
     defaultPreparationTime?: number;
@@ -47,15 +187,39 @@ type TenantCreateInput = {
   };
 };
 
+type PlanInput = {
+  name: string;
+  description?: string | null;
+  price?: number;
+  maxUsers?: number | null;
+  maxBranches?: number | null;
+  limits?: Partial<Omit<PlanLimits, "branches" | "users">>;
+  capabilities?: Partial<PlanCapabilities>;
+  status?: RecordStatus;
+};
+
 type TenantUpdateInput = {
   name?: string;
+  legalName?: string | null;
   document?: string | null;
   email?: string | null;
   phone?: string | null;
   settings?: {
     brandName?: string;
+    legalName?: string | null;
+    description?: string | null;
+    slogan?: string | null;
+    businessType?: string | null;
+    cuisineCategory?: string | null;
+    websiteUrl?: string | null;
+    instagramUrl?: string | null;
+    whatsapp?: string | null;
     logoUrl?: string | null;
+    coverImageUrl?: string | null;
     primaryColor?: string;
+    secondaryColor?: string;
+    themeFontFamily?: string | null;
+    welcomeMessage?: string | null;
     allowGuestCheckout?: boolean;
     autoAcceptOrders?: boolean;
     defaultPreparationTime?: number;
@@ -74,6 +238,12 @@ const tenantInclude = {
   }
 } satisfies Prisma.TenantInclude;
 
+const hashInviteToken = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
+
+function buildInviteUrl(token: string) {
+  return `${env.FRONTEND_URL.replace(/\/$/, "")}/invite/${token}`;
+}
+
 function normalizePlanName(planName?: string | null, status?: TenantStatus): PlanName {
   const upperName = planName?.toUpperCase();
 
@@ -84,7 +254,127 @@ function normalizePlanName(planName?: string | null, status?: TenantStatus): Pla
   return status === "TRIAL" ? "TRIAL" : "BASIC";
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function nullableNumber(value: unknown, fallback: number | null): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function booleanValue(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function defaultPlanFeatures(planName: PlanName): PlanFeatures {
+  const defaults = DEFAULT_PLAN_DEFINITIONS[planName].features;
+  return {
+    limits: { ...defaults.limits },
+    capabilities: { ...defaults.capabilities }
+  };
+}
+
+function extractPlanFeatures(planName: PlanName, features?: Prisma.JsonValue | null): PlanFeatures {
+  const defaults = defaultPlanFeatures(planName);
+  const root = isObject(features) ? features : {};
+  const limits = isObject(root.limits) ? root.limits : {};
+  const capabilities = isObject(root.capabilities) ? root.capabilities : {};
+
+  return {
+    limits: {
+      products: nullableNumber(limits.products, defaults.limits.products),
+      coupons: nullableNumber(limits.coupons, defaults.limits.coupons),
+      ordersPerMonth: nullableNumber(limits.ordersPerMonth, defaults.limits.ordersPerMonth)
+    },
+    capabilities: {
+      onlineOrders: booleanValue(capabilities.onlineOrders, defaults.capabilities.onlineOrders),
+      menuBuilder: booleanValue(capabilities.menuBuilder, defaults.capabilities.menuBuilder),
+      kitchen: booleanValue(capabilities.kitchen, defaults.capabilities.kitchen),
+      coupons: booleanValue(capabilities.coupons, defaults.capabilities.coupons),
+      reports: booleanValue(capabilities.reports, defaults.capabilities.reports),
+      stockControl: booleanValue(capabilities.stockControl, defaults.capabilities.stockControl),
+      customBranding: booleanValue(capabilities.customBranding, defaults.capabilities.customBranding),
+      multiBranch: booleanValue(capabilities.multiBranch, defaults.capabilities.multiBranch),
+      apiAccess: booleanValue(capabilities.apiAccess, defaults.capabilities.apiAccess),
+      prioritySupport: booleanValue(capabilities.prioritySupport, defaults.capabilities.prioritySupport)
+    }
+  };
+}
+
+function buildPlanFeatures(data: Pick<PlanInput, "limits" | "capabilities">, current?: Prisma.JsonValue | null, planName: PlanName = "BASIC") {
+  const base = extractPlanFeatures(planName, current);
+
+  return {
+    limits: {
+      ...base.limits,
+      ...data.limits
+    },
+    capabilities: {
+      ...base.capabilities,
+      ...data.capabilities
+    }
+  } satisfies PlanFeatures;
+}
+
+function mapPlan(plan: Prisma.PlanGetPayload<object>) {
+  const planName = normalizePlanName(plan.name);
+  const features = extractPlanFeatures(planName, plan.features);
+  const limits = {
+    branches: plan.maxBranches,
+    users: plan.maxUsers,
+    products: features.limits.products,
+    coupons: features.limits.coupons,
+    ordersPerMonth: features.limits.ordersPerMonth
+  };
+
+  return {
+    id: plan.id,
+    name: plan.name,
+    description: plan.description,
+    price: Number(plan.price),
+    maxUsers: plan.maxUsers,
+    maxBranches: plan.maxBranches,
+    status: plan.status,
+    limits,
+    capabilities: features.capabilities,
+    createdAt: plan.createdAt,
+    updatedAt: plan.updatedAt
+  };
+}
+
+function mapPlanAudit(plan: Prisma.PlanGetPayload<object>) {
+  const mapped = mapPlan(plan);
+
+  return {
+    ...mapped,
+    createdAt: mapped.createdAt.toISOString(),
+    updatedAt: mapped.updatedAt.toISOString()
+  };
+}
+
+async function ensureDefaultPlans() {
+  await Promise.all(
+    Object.entries(DEFAULT_PLAN_DEFINITIONS).map(([name, definition]) =>
+      prisma.plan.upsert({
+        where: { name },
+        create: {
+          name,
+          description: definition.description,
+          price: new Prisma.Decimal(definition.price),
+          maxUsers: definition.maxUsers,
+          maxBranches: definition.maxBranches,
+          features: definition.features,
+          status: "ACTIVE"
+        },
+        update: {}
+      })
+    )
+  );
+}
+
 async function resolvePlan(planId?: string | null, planName?: PlanName | null) {
+  await ensureDefaultPlans();
+
   if (planId) {
     return prisma.plan.findUnique({ where: { id: planId } });
   }
@@ -115,8 +405,15 @@ async function getUsageCounts(tenantId: string) {
   return { branches, users, products, coupons, ordersLast30Days };
 }
 
-function usageWithLimits(counts: Awaited<ReturnType<typeof getUsageCounts>>, planName: PlanName) {
-  const limits = PLAN_LIMITS[planName];
+function usageWithLimits(counts: Awaited<ReturnType<typeof getUsageCounts>>, plan?: Prisma.PlanGetPayload<object> | null, status?: TenantStatus) {
+  const planName = normalizePlanName(plan?.name, status);
+  const features = extractPlanFeatures(planName, plan?.features);
+  const limits = {
+    branches: plan?.maxBranches ?? DEFAULT_PLAN_DEFINITIONS[planName].maxBranches,
+    users: plan?.maxUsers ?? DEFAULT_PLAN_DEFINITIONS[planName].maxUsers,
+    products: features.limits.products,
+    coupons: features.limits.coupons
+  };
 
   return {
     planName,
@@ -138,6 +435,7 @@ async function mapTenant(tenant: Prisma.TenantGetPayload<{ include: typeof tenan
     id: tenant.id,
     name: tenant.name,
     slug: tenant.slug,
+    legalName: tenant.legalName,
     document: tenant.document,
     email: tenant.email,
     phone: tenant.phone,
@@ -155,7 +453,7 @@ async function mapTenant(tenant: Prisma.TenantGetPayload<{ include: typeof tenan
       branches: tenant._count.branches,
       users: tenant._count.users
     },
-    usage: usageWithLimits(counts, planName),
+    usage: usageWithLimits(counts, tenant.plan, tenant.status),
     createdAt: tenant.createdAt,
     updatedAt: tenant.updatedAt
   };
@@ -250,32 +548,108 @@ async function ensureKitchenRole(tenantId: string) {
 }
 
 export const listPlans = async () => {
+  await ensureDefaultPlans();
+
   const plans = await prisma.plan.findMany({
-    where: { status: "ACTIVE" },
-    orderBy: { price: "asc" }
+    orderBy: [{ status: "asc" }, { price: "asc" }, { name: "asc" }]
   });
 
-  const persistedNames = new Set(plans.map((plan) => plan.name.toUpperCase()));
-  const fallbackPlans = Object.entries(PLAN_LIMITS)
-    .filter(([name]) => !persistedNames.has(name))
-    .map(([name, limits]) => ({
-      id: null,
-      name,
-      description: `${limits.label} PodePedir`,
-      price: 0,
-      limits
-    }));
+  return plans.map(mapPlan);
+};
 
-  return [
-    ...plans.map((plan) => ({
-      id: plan.id,
-      name: plan.name,
-      description: plan.description,
-      price: Number(plan.price),
-      limits: PLAN_LIMITS[normalizePlanName(plan.name)]
-    })),
-    ...fallbackPlans
-  ];
+export const createPlan = async (data: PlanInput, actor: Actor) => {
+  await ensureDefaultPlans();
+
+  const name = data.name.trim().toUpperCase();
+  const planName = normalizePlanName(name);
+  const created = await prisma.plan.create({
+    data: {
+      name,
+      description: data.description,
+      price: new Prisma.Decimal(data.price ?? 0),
+      maxUsers: data.maxUsers,
+      maxBranches: data.maxBranches,
+      features: buildPlanFeatures(data, null, planName),
+      status: data.status ?? "ACTIVE"
+    }
+  });
+
+  await createAuditLog({
+    actor,
+    action: "platform.plan_created",
+    entity: "Plan",
+    entityId: created.id,
+    after: mapPlanAudit(created)
+  });
+
+  return mapPlan(created);
+};
+
+export const updatePlan = async (id: string, data: Partial<PlanInput>, actor: Actor) => {
+  const plan = await prisma.plan.findUnique({ where: { id } });
+
+  if (!plan) {
+    throw new AppError("Plan not found", 404);
+  }
+
+  const nextName = data.name?.trim().toUpperCase();
+  const planName = normalizePlanName(nextName ?? plan.name);
+  const updated = await prisma.plan.update({
+    where: { id },
+    data: {
+      name: nextName,
+      description: data.description,
+      price: data.price === undefined ? undefined : new Prisma.Decimal(data.price),
+      maxUsers: data.maxUsers,
+      maxBranches: data.maxBranches,
+      status: data.status,
+      features: data.limits || data.capabilities ? buildPlanFeatures(data, plan.features, planName) : undefined
+    }
+  });
+
+  await createAuditLog({
+    actor,
+    action: "platform.plan_updated",
+    entity: "Plan",
+    entityId: id,
+    before: mapPlanAudit(plan),
+    after: mapPlanAudit(updated)
+  });
+
+  return mapPlan(updated);
+};
+
+export const deletePlan = async (id: string, actor: Actor) => {
+  const plan = await prisma.plan.findUnique({ where: { id }, include: { _count: { select: { tenants: true } } } });
+
+  if (!plan) {
+    throw new AppError("Plan not found", 404);
+  }
+
+  if (plan._count.tenants > 0) {
+    const updated = await prisma.plan.update({ where: { id }, data: { status: "INACTIVE" } });
+
+    await createAuditLog({
+      actor,
+      action: "platform.plan_disabled",
+      entity: "Plan",
+      entityId: id,
+      before: { status: plan.status },
+      after: { status: updated.status }
+    });
+
+    return mapPlan(updated);
+  }
+
+  await prisma.plan.delete({ where: { id } });
+
+  await createAuditLog({
+    actor,
+    action: "platform.plan_deleted",
+    entity: "Plan",
+    entityId: id,
+    before: mapPlanAudit(plan)
+  });
 };
 
 export const listTenants = async (params: ListTenantsParams) => {
@@ -330,6 +704,7 @@ export const createTenant = async (data: TenantCreateInput, actor: Actor) => {
       data: {
         name: data.name,
         slug: data.slug,
+        legalName: data.legalName ?? data.settings?.legalName,
         document: data.document,
         email: data.email,
         phone: data.phone,
@@ -338,22 +713,44 @@ export const createTenant = async (data: TenantCreateInput, actor: Actor) => {
         settings: {
           create: {
             brandName: data.settings?.brandName ?? data.name,
+            legalName: data.settings?.legalName ?? data.legalName,
+            description: data.settings?.description,
+            slogan: data.settings?.slogan,
+            businessType: data.settings?.businessType,
+            cuisineCategory: data.settings?.cuisineCategory,
+            websiteUrl: data.settings?.websiteUrl,
+            instagramUrl: data.settings?.instagramUrl,
+            whatsapp: data.settings?.whatsapp,
             logoUrl: data.settings?.logoUrl,
+            coverImageUrl: data.settings?.coverImageUrl,
             primaryColor: data.settings?.primaryColor ?? "#1a6b3b",
+            secondaryColor: data.settings?.secondaryColor ?? "#27ae51",
+            themeFontFamily: data.settings?.themeFontFamily ?? "Inter",
+            welcomeMessage: data.settings?.welcomeMessage,
             allowGuestCheckout: data.settings?.allowGuestCheckout ?? true,
             autoAcceptOrders: data.settings?.autoAcceptOrders ?? false,
             defaultPreparationTime: data.settings?.defaultPreparationTime ?? 30,
             minimumOrderValue: new Prisma.Decimal(data.settings?.minimumOrderValue ?? 0)
           }
-        },
-        branches: {
-          create: {
-            name: "Matriz",
-            slug: "matriz",
-            email: data.email,
-            phone: data.phone
-          }
         }
+      }
+    });
+
+    await tx.branch.create({
+      data: {
+        tenant: { connect: { id: createdTenant.id } },
+        name: data.branch?.name ?? "Matriz",
+        slug: "matriz",
+        email: data.branch?.email ?? data.email,
+        phone: data.branch?.phone ?? data.phone,
+        address: data.branch?.address
+          ? {
+              create: {
+                tenantId: createdTenant.id,
+                ...data.branch.address
+              }
+            }
+          : undefined
       }
     });
 
@@ -389,6 +786,8 @@ export const createTenant = async (data: TenantCreateInput, actor: Actor) => {
     }
   });
 
+  const invite = await createInviteForMembership(tenant.id, adminUser.email, adminRole.name, actor);
+
   await createAuditLog({
     tenantId: tenant.id,
     actor,
@@ -400,12 +799,54 @@ export const createTenant = async (data: TenantCreateInput, actor: Actor) => {
       slug: data.slug,
       status: data.status,
       planName: plan?.name ?? data.planName,
-      adminEmail: data.adminEmail
+      adminEmail: data.adminEmail,
+      legalName: data.legalName,
+      document: data.document
     }
   });
 
-  return getTenant(tenant.id);
+  return {
+    ...(await getTenant(tenant.id)),
+    invite
+  };
 };
+
+async function createInviteForMembership(tenantId: string, email: string, role: string, actor: Actor) {
+  const token = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+  await prisma.tenantInvite.updateMany({
+    where: { tenantId, email, acceptedAt: null },
+    data: { acceptedAt: new Date() }
+  });
+
+  const invite = await prisma.tenantInvite.create({
+    data: {
+      tenantId,
+      email,
+      role,
+      tokenHash: hashInviteToken(token),
+      expiresAt,
+      createdByUserId: actor.userId
+    }
+  });
+
+  await createAuditLog({
+    tenantId,
+    actor,
+    action: "tenant.invite_created",
+    entity: "TenantInvite",
+    entityId: invite.id,
+    after: { email, role, expiresAt: expiresAt.toISOString() }
+  });
+
+  return {
+    email,
+    role,
+    expiresAt,
+    acceptUrl: buildInviteUrl(token)
+  };
+}
 
 export const getTenant = async (id: string) => {
   const tenant = await prisma.tenant.findFirst({
@@ -481,6 +922,7 @@ export const updateTenant = async (id: string, data: TenantUpdateInput, actor: A
     where: { id },
     data: {
       name: data.name,
+      legalName: data.legalName,
       document: data.document,
       email: data.email,
       phone: data.phone,
@@ -489,8 +931,20 @@ export const updateTenant = async (id: string, data: TenantUpdateInput, actor: A
             upsert: {
               create: {
                 brandName: data.settings.brandName ?? data.name ?? tenant.name,
+                legalName: data.settings.legalName ?? data.legalName,
+                description: data.settings.description,
+                slogan: data.settings.slogan,
+                businessType: data.settings.businessType,
+                cuisineCategory: data.settings.cuisineCategory,
+                websiteUrl: data.settings.websiteUrl,
+                instagramUrl: data.settings.instagramUrl,
+                whatsapp: data.settings.whatsapp,
                 logoUrl: data.settings.logoUrl,
+                coverImageUrl: data.settings.coverImageUrl,
                 primaryColor: data.settings.primaryColor ?? "#1a6b3b",
+                secondaryColor: data.settings.secondaryColor ?? "#27ae51",
+                themeFontFamily: data.settings.themeFontFamily ?? "Inter",
+                welcomeMessage: data.settings.welcomeMessage,
                 allowGuestCheckout: data.settings.allowGuestCheckout ?? true,
                 autoAcceptOrders: data.settings.autoAcceptOrders ?? false,
                 defaultPreparationTime: data.settings.defaultPreparationTime ?? 30,
@@ -498,8 +952,20 @@ export const updateTenant = async (id: string, data: TenantUpdateInput, actor: A
               },
               update: {
                 brandName: data.settings.brandName,
+                legalName: data.settings.legalName,
+                description: data.settings.description,
+                slogan: data.settings.slogan,
+                businessType: data.settings.businessType,
+                cuisineCategory: data.settings.cuisineCategory,
+                websiteUrl: data.settings.websiteUrl,
+                instagramUrl: data.settings.instagramUrl,
+                whatsapp: data.settings.whatsapp,
                 logoUrl: data.settings.logoUrl,
+                coverImageUrl: data.settings.coverImageUrl,
                 primaryColor: data.settings.primaryColor,
+                secondaryColor: data.settings.secondaryColor,
+                themeFontFamily: data.settings.themeFontFamily,
+                welcomeMessage: data.settings.welcomeMessage,
                 allowGuestCheckout: data.settings.allowGuestCheckout,
                 autoAcceptOrders: data.settings.autoAcceptOrders,
                 defaultPreparationTime: data.settings.defaultPreparationTime,
@@ -523,6 +989,7 @@ export const updateTenant = async (id: string, data: TenantUpdateInput, actor: A
     entityId: id,
     before: {
       name: tenant.name,
+      legalName: tenant.legalName,
       document: tenant.document,
       email: tenant.email,
       phone: tenant.phone,
@@ -532,6 +999,32 @@ export const updateTenant = async (id: string, data: TenantUpdateInput, actor: A
   });
 
   return mapTenant(updated);
+};
+
+export const deleteTenant = async (id: string, actor: Actor) => {
+  const tenant = await prisma.tenant.findFirst({ where: { id, deletedAt: null } });
+
+  if (!tenant) {
+    throw new AppError("Tenant not found", 404);
+  }
+
+  await prisma.tenant.update({
+    where: { id },
+    data: {
+      status: "CANCELLED",
+      deletedAt: new Date()
+    }
+  });
+
+  await createAuditLog({
+    tenantId: id,
+    actor,
+    action: "tenant.deleted",
+    entity: "Tenant",
+    entityId: id,
+    before: { name: tenant.name, slug: tenant.slug, status: tenant.status },
+    after: { status: "CANCELLED", deletedAt: new Date().toISOString() }
+  });
 };
 
 export const updateTenantStatus = async (id: string, status: TenantStatus, reason: string, actor: Actor) => {
@@ -577,11 +1070,12 @@ export const updateTenantPlan = async (id: string, planId: string | null | undef
     throw new AppError("Plan not found", 404);
   }
 
+  const selectedPlanName = normalizePlanName(plan?.name, planName === "TRIAL" ? "TRIAL" : undefined);
   const updated = await prisma.tenant.update({
     where: { id },
     data: {
       planId: plan?.id ?? null,
-      status: planName === "TRIAL" ? "TRIAL" : tenant.status === "TRIAL" ? "ACTIVE" : undefined
+      status: selectedPlanName === "TRIAL" ? "TRIAL" : tenant.status === "TRIAL" ? "ACTIVE" : undefined
     },
     include: tenantInclude
   });
@@ -599,6 +1093,23 @@ export const updateTenantPlan = async (id: string, planId: string | null | undef
   return mapTenant(updated);
 };
 
+export const createInviteLink = async (tenantId: string, tenantUserId: string, actor: Actor) => {
+  const membership = await prisma.tenantUser.findFirst({
+    where: { id: tenantUserId, tenantId },
+    include: { user: true, role: true }
+  });
+
+  if (!membership) {
+    throw new AppError("Tenant user not found", 404);
+  }
+
+  if (membership.status === "ACTIVE") {
+    throw new AppError("User already accepted the invite", 409);
+  }
+
+  return createInviteForMembership(tenantId, membership.user.email, membership.role.name, actor);
+};
+
 export const getTenantUsage = async (id: string) => {
   const tenant = await prisma.tenant.findFirst({ where: { id, deletedAt: null }, include: { plan: true } });
 
@@ -606,7 +1117,7 @@ export const getTenantUsage = async (id: string) => {
     throw new AppError("Tenant not found", 404);
   }
 
-  return usageWithLimits(await getUsageCounts(id), normalizePlanName(tenant.plan?.name, tenant.status));
+  return usageWithLimits(await getUsageCounts(id), tenant.plan, tenant.status);
 };
 
 export const listAuditLogs = async (params: {

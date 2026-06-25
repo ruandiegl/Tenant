@@ -65,7 +65,7 @@
   border-radius: 8px;
   color: var(--brand-dark);
   display: inline-flex;
-  font-weight: 850;
+  font-weight: 800;
   gap: 7px;
   justify-content: center;
   min-height: 38px;
@@ -84,7 +84,7 @@
   border-radius: 8px;
   color: var(--text);
   display: flex;
-  font-weight: 850;
+  font-weight: 800;
   gap: 10px;
   min-height: 48px;
   padding: 0 12px;
@@ -179,7 +179,7 @@
   border-radius: 999px;
   color: var(--text);
   font-size: 0.8rem;
-  font-weight: 850;
+  font-weight: 700;
   min-height: 30px;
   padding: 7px 10px;
 }
@@ -240,7 +240,7 @@
   color: var(--brand-dark);
   display: inline-flex;
   font-size: 0.82rem;
-  font-weight: 850;
+  font-weight: 700;
   gap: 6px;
   min-height: 32px;
   padding: 0 10px;
@@ -279,7 +279,7 @@
   border: 0;
   color: var(--brand-dark);
   font: inherit;
-  font-weight: 850;
+  font-weight: 800;
   outline: 0;
   width: 100%;
 }

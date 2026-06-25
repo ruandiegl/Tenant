@@ -27,7 +27,7 @@
   display: inline-flex;
   flex: 0 0 auto;
   font: inherit;
-  font-weight: 850;
+  font-weight: 800;
   gap: 8px;
   height: 42px;
   overflow: hidden;
@@ -161,7 +161,7 @@
   color: #4f6359;
   display: grid;
   font-size: 0.78rem;
-  font-weight: 850;
+  font-weight: 700;
   gap: 5px;
 }
 

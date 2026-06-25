@@ -17,6 +17,7 @@ import { tenantOrdersRoutes, publicOrdersRoutes } from "./modules/orders/orders.
 import { reportsRoutes } from "./modules/reports/reports.routes.js";
 import { publicTenantRoutes } from "./modules/tenants/tenants.routes.js";
 import { platformAuditRoutes, tenantManagementRoutes } from "./modules/tenant-management/tenant-management.routes.js";
+import { tenantSettingsRoutes } from "./modules/tenant-settings/tenant-settings.routes.js";
 import { usersRoutes } from "./modules/users/users.routes.js";
 import { errorMiddleware } from "./shared/middlewares/error.middleware.js";
 
@@ -46,6 +47,7 @@ app.use("/tenants", publicTenantRoutes);
 app.use("/admin/tenants", tenantManagementRoutes);
 app.use("/admin/audit-logs", platformAuditRoutes);
 app.use("/tenant/users", usersRoutes);
+app.use("/tenant/settings", tenantSettingsRoutes);
 app.use("/tenant/branches", branchesRoutes);
 app.use("/tenant/menu", tenantMenuRoutes);
 app.use("/tenant/orders", tenantOrdersRoutes);

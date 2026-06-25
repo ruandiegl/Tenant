@@ -1,7 +1,6 @@
 import { Order, OrderStatus } from "../types/database";
 import { protectedApi, api, getApiBaseUrl } from "./api";
-
-const TENANT_SLUG = import.meta.env.VITE_DEMO_TENANT_SLUG ?? "demo-burger";
+import { DEFAULT_PUBLIC_TENANT_SLUG } from "../utils/public-tenant-route";
 const DEMO_BRANCH_ID = import.meta.env.VITE_DEMO_BRANCH_ID;
 
 type BackendOrder = Omit<Order, "history" | "items" | "source"> & {
@@ -81,10 +80,11 @@ export const ordersService = {
     return (await protectedApi<BackendOrder[]>(`/tenant/orders${suffix}`)).map(mapOrder);
   },
   get: async (orderId: string) => mapOrder(await protectedApi<BackendOrder>(`/tenant/orders/${orderId}`)),
-  getByPublicCode: async (publicCode: string) => mapOrder(await api<BackendOrder>(`/public/${TENANT_SLUG}/orders/${publicCode}`)),
-  createPublicOrder: async (payload: PublicOrderPayload) => {
-    const branchId = DEMO_BRANCH_ID ?? (await getDefaultPublicBranchId());
-    const response = await fetch(`${getApiBaseUrl()}/public/${TENANT_SLUG}/orders`, {
+  getByPublicCode: async (publicCode: string, tenantSlug = DEFAULT_PUBLIC_TENANT_SLUG) =>
+    mapOrder(await api<BackendOrder>(`/public/${tenantSlug}/orders/${publicCode}`)),
+  createPublicOrder: async (payload: PublicOrderPayload, tenantSlug = DEFAULT_PUBLIC_TENANT_SLUG) => {
+    const branchId = DEMO_BRANCH_ID ?? (await getDefaultPublicBranchId(tenantSlug));
+    const response = await fetch(`${getApiBaseUrl()}/public/${tenantSlug}/orders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -107,8 +107,8 @@ export const ordersService = {
     }).then(mapOrder)
 };
 
-async function getDefaultPublicBranchId() {
-  const tenant = await api<PublicTenantResponse>(`/tenants/${TENANT_SLUG}/public`);
+async function getDefaultPublicBranchId(tenantSlug = DEFAULT_PUBLIC_TENANT_SLUG) {
+  const tenant = await api<PublicTenantResponse>(`/tenants/${tenantSlug}/public`);
   const branchId = tenant.branches?.[0]?.id;
 
   if (!branchId) {

@@ -1,4 +1,4 @@
-import { Navigate, NavLink, Route, BrowserRouter as Router, Routes, useLocation } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { ChefHat, Menu as MenuIcon, ReceiptText, ShoppingBag, UserRound } from "lucide-react";
 import { AdminLayout } from "../app/layouts/admin-layout";
 import { SuperAdminLayout } from "../app/layouts/superadmin-layout";
@@ -9,6 +9,7 @@ import { AdminMenu } from "../pages/admin/menu";
 import { AdminSettings } from "../pages/admin/settings";
 import { SuperAdminAuditLogs } from "../pages/superadmin/audit-logs";
 import { SuperAdminDashboard } from "../pages/superadmin/dashboard";
+import { SuperAdminPlans } from "../pages/superadmin/plans";
 import { SuperAdminTenantDetail } from "../pages/superadmin/tenant-detail";
 import { SuperAdminTenants } from "../pages/superadmin/tenants";
 import { KitchenQueue } from "../pages/kitchen/queue";
@@ -16,33 +17,33 @@ import { CustomerMenu } from "../pages/customer/menu";
 import { CustomerCart } from "../pages/customer/cart";
 import { CustomerProfile } from "../pages/customer/profile";
 import { LoginPage } from "../pages/auth/login";
+import { AcceptInvitePage } from "../pages/invite/accept";
 import { OrderTracking } from "../pages/customer/order-tracking";
 import { useCustomerFlow } from "../app/providers/customer-flow-provider";
-
-const customerNavItems = [
-  { to: "/cliente/menu", label: "Menu", icon: MenuIcon },
-  { to: "/cliente/carrinho", label: "Carrinho", icon: ShoppingBag },
-  { to: "/cliente/pedido", label: "Pedido", icon: ReceiptText },
-  { to: "/cliente/perfil", label: "Perfil", icon: UserRound }
-];
+import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../utils/public-tenant-route";
 
 const staffNavItems = [
   { to: "/cozinha", label: "Cozinha", icon: ChefHat }
 ];
 
 export function AppRoutes() {
-  return (
-    <Router>
-      <RouteShell />
-    </Router>
-  );
+  return <RouteShell />;
 }
 
 function RouteShell() {
   const location = useLocation();
   const { order } = useCustomerFlow();
+  const publicTenantSlug = getPublicTenantSlug(location.pathname) ?? DEFAULT_PUBLIC_TENANT_SLUG;
+  const customerNavItems = [
+    { to: publicTenantPath(publicTenantSlug, "/menu"), label: "Menu", icon: MenuIcon },
+    { to: publicTenantPath(publicTenantSlug, "/carrinho"), label: "Carrinho", icon: ShoppingBag },
+    { to: publicTenantPath(publicTenantSlug, "/pedido"), label: "Pedido", icon: ReceiptText },
+    { to: publicTenantPath(publicTenantSlug, "/perfil"), label: "Perfil", icon: UserRound }
+  ];
   const isAuthRoute = location.pathname === "/login";
-  const isCustomerRoute = location.pathname.startsWith("/cliente");
+  const isInviteRoute = location.pathname.startsWith("/invite");
+  const isLegacyCustomerRoute = location.pathname.startsWith("/cliente");
+  const isCustomerRoute = Boolean(getPublicTenantSlug(location.pathname)) || isLegacyCustomerRoute;
   const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/superadmin");
   const navItems = isCustomerRoute ? customerNavItems : staffNavItems;
 
@@ -50,17 +51,18 @@ function RouteShell() {
     <div className={`app-shell ${isAdminRoute ? "admin-shell-active" : ""}`}>
       <main className={`app-main ${isAdminRoute ? "admin-main" : ""}`}>
         <Routes>
-          <Route path="/" element={<Navigate to="/cliente/menu" replace />} />
+          <Route path="/" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG)} replace />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/cliente" element={<Navigate to="/cliente/menu" replace />} />
-          <Route path="/cliente/menu" element={<CustomerMenu />} />
-          <Route path="/cliente/carrinho" element={<CustomerCart step="cart" />} />
-          <Route path="/cliente/carrinho/endereco" element={<CustomerCart step="address" />} />
-          <Route path="/cliente/carrinho/pagamento" element={<CustomerCart step="payment" />} />
-          <Route path="/cliente/carrinho/confirmacao" element={<CustomerCart step="done" />} />
-          <Route path="/cliente/perfil" element={<CustomerProfile />} />
-          <Route path="/cliente/pedido" element={<OrderTracking publicCodeFallback={order?.publicCode} />} />
-          <Route path="/cliente/pedido/:publicCode" element={<OrderTracking />} />
+          <Route path="/invite/:token" element={<AcceptInvitePage />} />
+          <Route path="/cliente" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG)} replace />} />
+          <Route path="/cliente/menu" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG, "/menu")} replace />} />
+          <Route path="/cliente/carrinho" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG, "/carrinho")} replace />} />
+          <Route path="/cliente/carrinho/endereco" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG, "/carrinho/endereco")} replace />} />
+          <Route path="/cliente/carrinho/pagamento" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG, "/carrinho/pagamento")} replace />} />
+          <Route path="/cliente/carrinho/confirmacao" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG, "/carrinho/confirmacao")} replace />} />
+          <Route path="/cliente/perfil" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG, "/perfil")} replace />} />
+          <Route path="/cliente/pedido" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG, "/pedido")} replace />} />
+          <Route path="/cliente/pedido/:publicCode" element={<Navigate to={publicTenantPath(DEFAULT_PUBLIC_TENANT_SLUG, `/pedido/${location.pathname.split("/").pop() ?? ""}`)} replace />} />
           <Route
             path="/cozinha"
             element={
@@ -122,7 +124,7 @@ function RouteShell() {
           <Route
             path="/superadmin"
             element={
-              <ProtectedRoute permission="platform.tenants.read">
+              <ProtectedRoute permission="platform.tenants.read" platformOnly>
                 <SuperAdminLayout>
                   <SuperAdminDashboard />
                 </SuperAdminLayout>
@@ -132,7 +134,7 @@ function RouteShell() {
           <Route
             path="/superadmin/tenants"
             element={
-              <ProtectedRoute permission="platform.tenants.read">
+              <ProtectedRoute permission="platform.tenants.read" platformOnly>
                 <SuperAdminLayout>
                   <SuperAdminTenants />
                 </SuperAdminLayout>
@@ -142,7 +144,7 @@ function RouteShell() {
           <Route
             path="/superadmin/tenants/:id"
             element={
-              <ProtectedRoute permission="platform.tenants.read">
+              <ProtectedRoute permission="platform.tenants.read" platformOnly>
                 <SuperAdminLayout>
                   <SuperAdminTenantDetail />
                 </SuperAdminLayout>
@@ -150,21 +152,40 @@ function RouteShell() {
             }
           />
           <Route
+            path="/superadmin/planos"
+            element={
+              <ProtectedRoute permission="platform.tenants.read" platformOnly>
+                <SuperAdminLayout>
+                  <SuperAdminPlans />
+                </SuperAdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/superadmin/audit-logs"
             element={
-              <ProtectedRoute permission="platform.tenants.read">
+              <ProtectedRoute permission="platform.tenants.read" platformOnly>
                 <SuperAdminLayout>
                   <SuperAdminAuditLogs />
                 </SuperAdminLayout>
               </ProtectedRoute>
             }
           />
+          <Route path="/:tenantSlug" element={<CustomerMenu />} />
+          <Route path="/:tenantSlug/menu" element={<CustomerMenu />} />
+          <Route path="/:tenantSlug/carrinho" element={<CustomerCart step="cart" />} />
+          <Route path="/:tenantSlug/carrinho/endereco" element={<CustomerCart step="address" />} />
+          <Route path="/:tenantSlug/carrinho/pagamento" element={<CustomerCart step="payment" />} />
+          <Route path="/:tenantSlug/carrinho/confirmacao" element={<CustomerCart step="done" />} />
+          <Route path="/:tenantSlug/perfil" element={<CustomerProfile />} />
+          <Route path="/:tenantSlug/pedido" element={<OrderTracking publicCodeFallback={order?.publicCode} />} />
+          <Route path="/:tenantSlug/pedido/:publicCode" element={<OrderTracking />} />
         </Routes>
       </main>
-      {!isAuthRoute && !isAdminRoute && (
+      {!isAuthRoute && !isInviteRoute && !isAdminRoute && (
         <nav className={`bottom-nav ${isCustomerRoute ? "customer-nav" : "staff-nav"}`} aria-label="Navegacao principal">
           {navItems.map((item) => (
-            <NavLink end={item.to === "/cliente/menu" || item.to === "/cliente/perfil"} key={item.to} to={item.to}>
+            <NavLink end={item.to.endsWith("/menu") || item.to.endsWith("/perfil")} key={item.to} to={item.to}>
               <item.icon size={18} aria-hidden="true" />
               <span>{item.label}</span>
             </NavLink>

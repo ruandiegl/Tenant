@@ -3,9 +3,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { Edit3, PackageCheck, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { CategoryDraft, ProductDraft, useCatalog } from "../../../app/providers/catalog-provider";
+import { useAuth } from "../../../app/providers/auth-provider";
 import { ImageUploadField } from "../../../components/forms/image-upload-field";
 import { MoneyInput } from "../../../components/forms/money-input";
 import { ProductCard } from "../../../components/menu/product-card";
+import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { MenuCategory, Product, ProductStatus, ProductTemplate } from "../../../types/database";
@@ -51,6 +53,11 @@ type TemplateDraft = {
   complements: Array<{ name: string; price: number }>;
 };
 
+type DeleteTarget =
+  | { type: "category"; id: string; name: string }
+  | { type: "product"; id: string; name: string }
+  | { type: "template"; id: string; name: string };
+
 function categoryToDraft(category: MenuCategory): CategoryDraft {
   return {
     name: category.name,
@@ -88,6 +95,7 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 export function AdminMenu() {
+  const { hasPlanCapability } = useAuth();
   const {
     categories,
     products,
@@ -119,6 +127,8 @@ export function AdminMenu() {
   const [templates, setTemplates] = useState<ProductTemplate[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const stockControlEnabled = hasPlanCapability("stockControl");
   const categoriesWithProducts = categories.map((category) => ({
     ...category,
     products: products.filter((product) => product.categoryId === category.id)
@@ -270,6 +280,25 @@ export function AdminMenu() {
     }
   };
 
+  const deleteTargetCopy =
+    deleteTarget?.type === "category"
+      ? {
+          title: "Excluir categoria",
+          description: `Excluir ${deleteTarget.name} remove a categoria do cardapio administrativo. Produtos vinculados podem impedir a exclusao.`,
+          confirmLabel: "Excluir categoria"
+        }
+      : deleteTarget?.type === "product"
+        ? {
+            title: "Excluir produto",
+            description: `Excluir ${deleteTarget.name} remove o produto do cardapio do cliente e da lista operacional.`,
+            confirmLabel: "Excluir produto"
+          }
+        : {
+            title: "Excluir template",
+            description: `Excluir ${deleteTarget?.name ?? "este template"} remove este modelo de preparo dos proximos cadastros.`,
+            confirmLabel: "Excluir template"
+          };
+
   const handleDeleteCategory = async (categoryId: string) => {
     setActionError(null);
 
@@ -280,6 +309,25 @@ export function AdminMenu() {
       const message = errorMessage(error, "Nao foi possivel excluir a categoria.");
       setActionError(message);
       toast.error(message);
+    }
+  };
+
+  const confirmDeleteTarget = async () => {
+    if (!deleteTarget) return;
+
+    setSubmitting(true);
+    try {
+      if (deleteTarget.type === "category") {
+        await handleDeleteCategory(deleteTarget.id);
+      } else if (deleteTarget.type === "product") {
+        await handleDeleteProduct(deleteTarget.id);
+      } else {
+        await handleDeleteTemplate(deleteTarget.id);
+      }
+
+      setDeleteTarget(null);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -438,7 +486,11 @@ export function AdminMenu() {
       <PageHeader
         eyebrow="Cardapio"
         title="Categorias e produtos"
-        description="Gerencie o que aparece no menu do cliente, com status, complementos e estoque."
+        description={
+          stockControlEnabled
+            ? "Gerencie o que aparece no menu do cliente, com status, complementos e estoque."
+            : "Gerencie o que aparece no menu do cliente, com status e complementos."
+        }
       />
       {error || actionError ? <p className="form-error">{actionError ?? error}</p> : null}
       {loading ? <p className="muted-text">Carregando catalogo...</p> : null}
@@ -463,7 +515,7 @@ export function AdminMenu() {
                 <button aria-label={`Editar ${category.name}`} onClick={() => openEditCategory(category)}>
                   <Edit3 size={16} />
                 </button>
-                <button aria-label={`Excluir ${category.name}`} onClick={() => void handleDeleteCategory(category.id)}>
+                <button aria-label={`Excluir ${category.name}`} onClick={() => setDeleteTarget({ type: "category", id: category.id, name: category.name })}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -471,22 +523,24 @@ export function AdminMenu() {
           ))}
         </article>
 
-        <article className="panel">
-          <h2>Estoque</h2>
-          {productAvailability.map((availability) => {
-            const product = products.find((item) => item.id === availability.productId);
-            return (
-              <div className="management-row stock-row" key={availability.id}>
-                <div>
-                  <strong>{product?.name}</strong>
-                  <span>Estoque {availability.stockQuantity ?? 0}</span>
+        {stockControlEnabled ? (
+          <article className="panel">
+            <h2>Estoque</h2>
+            {productAvailability.map((availability) => {
+              const product = products.find((item) => item.id === availability.productId);
+              return (
+                <div className="management-row stock-row" key={availability.id}>
+                  <div>
+                    <strong>{product?.name}</strong>
+                    <span>Estoque {availability.stockQuantity ?? 0}</span>
+                  </div>
+                  <StatusBadge status={product?.status ?? "INACTIVE"} />
+                  <PackageCheck size={18} />
                 </div>
-                <StatusBadge status={product?.status ?? "INACTIVE"} />
-                <PackageCheck size={18} />
-              </div>
-            );
-          })}
-        </article>
+              );
+            })}
+          </article>
+        ) : null}
       </div>
 
       <article className="panel">
@@ -509,7 +563,7 @@ export function AdminMenu() {
                 <button onClick={() => openEditTemplate(template)}>
                   <Edit3 size={16} /> Editar
                 </button>
-                <button onClick={() => void handleDeleteTemplate(template.id)}>
+                <button onClick={() => setDeleteTarget({ type: "template", id: template.id, name: template.name })}>
                   <Trash2 size={16} /> Excluir
                 </button>
               </div>
@@ -552,7 +606,7 @@ export function AdminMenu() {
 
                   return (
                     <article className="catalog-product-row" key={product.id}>
-                      <ProductCard product={product} stockQuantity={getProductStock(product.id)} />
+                      <ProductCard product={product} stockQuantity={stockControlEnabled ? getProductStock(product.id) : undefined} />
                       <div className="catalog-product-details">
                         <div>
                           <span className="eyebrow">{category.name}</span>
@@ -562,7 +616,7 @@ export function AdminMenu() {
                         <div className="catalog-meta-grid">
                           <span>Base {formatCurrency(product.basePrice)}</span>
                           <span>Custo {formatCurrency(product.costPrice ?? 0)}</span>
-                          <span>Estoque {getProductStock(product.id)}</span>
+                          {stockControlEnabled ? <span>Estoque {getProductStock(product.id)}</span> : null}
                           <StatusBadge status={product.status} />
                         </div>
                         <p className="muted-text">
@@ -575,7 +629,7 @@ export function AdminMenu() {
                           <button onClick={() => openEditProduct(product)}>
                             <Edit3 size={16} /> Editar
                           </button>
-                          <button onClick={() => void handleDeleteProduct(product.id)}>
+                          <button onClick={() => setDeleteTarget({ type: "product", id: product.id, name: product.name })}>
                             <Trash2 size={16} /> Excluir
                           </button>
                         </div>
@@ -799,17 +853,19 @@ export function AdminMenu() {
 
               <MoneyInput label="Custo" value={productDraft.costPrice} onChange={(costPrice) => setProductDraft({ ...productDraft, costPrice })} />
 
-              <label className="field">
-                <span>Estoque</span>
-                <div>
-                  <input
-                    min="0"
-                    type="number"
-                    value={productDraft.stockQuantity}
-                    onChange={(event) => setProductDraft({ ...productDraft, stockQuantity: Number(event.target.value) })}
-                  />
-                </div>
-              </label>
+              {stockControlEnabled ? (
+                <label className="field">
+                  <span>Estoque</span>
+                  <div>
+                    <input
+                      min="0"
+                      type="number"
+                      value={productDraft.stockQuantity}
+                      onChange={(event) => setProductDraft({ ...productDraft, stockQuantity: Number(event.target.value) })}
+                    />
+                  </div>
+                </label>
+              ) : null}
 
               <label className="field">
                 <span>Preparo em minutos</span>
@@ -921,6 +977,16 @@ export function AdminMenu() {
           </form>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={deleteTargetCopy.title}
+        description={deleteTargetCopy.description}
+        confirmLabel={deleteTargetCopy.confirmLabel}
+        isLoading={submitting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void confirmDeleteTarget()}
+      />
     </section>
   );
 }

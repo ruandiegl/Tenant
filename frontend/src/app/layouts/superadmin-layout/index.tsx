@@ -1,13 +1,14 @@
 import "./styles.css";
 import { PropsWithChildren } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Building2, ClipboardList, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
+import { Building2, ClipboardList, LayoutDashboard, LogOut, PackageCheck, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "../../../components/brand-logo";
 import { useAuth } from "../../providers/auth-provider";
 
 const navItems = [
   { to: "/superadmin", label: "Visao geral", icon: LayoutDashboard, end: true },
   { to: "/superadmin/tenants", label: "Tenants", icon: Building2 },
+  { to: "/superadmin/planos", label: "Planos", icon: PackageCheck },
   { to: "/superadmin/audit-logs", label: "Auditoria", icon: ClipboardList }
 ];
 

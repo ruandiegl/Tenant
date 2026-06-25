@@ -11,7 +11,7 @@ const planMeta: Record<PlanName, { label: string; icon: typeof Sprout }> = {
 
 export function PlanBadge({ plan }: { plan: string }) {
   const normalized = plan.toUpperCase() as PlanName;
-  const meta = planMeta[normalized] ?? planMeta.BASIC;
+  const meta = planMeta[normalized] ?? { label: plan, icon: Gauge };
   const Icon = meta.icon;
 
   return (
