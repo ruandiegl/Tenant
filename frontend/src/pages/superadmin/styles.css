@@ -1,0 +1,267 @@
+.tms-screen {
+  gap: 20px;
+}
+
+.tms-dashboard-grid,
+.tms-detail-hero,
+.tms-detail-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.tms-command-panel {
+  align-content: start;
+  gap: 18px;
+}
+
+.tms-command-head,
+.tms-panel-title,
+.tms-table-row,
+.tms-table-head,
+.tms-tenant-list a,
+.tms-compact-list > div {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+}
+
+.tms-command-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.tms-command-head h2,
+.tms-tenant-profile h2,
+.tms-panel-title h2 {
+  margin: 0;
+}
+
+.tms-command-head p,
+.tms-tenant-profile p {
+  color: var(--muted);
+  font-weight: 750;
+  margin: 4px 0 0;
+}
+
+.tms-panel-title {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.tms-panel-title a,
+.tms-panel-title strong {
+  color: var(--brand);
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
+.tms-usage-stack,
+.tms-usage-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.tms-usage-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tms-tenant-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tms-tenant-list a {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 58px;
+  padding: 10px;
+}
+
+.tms-tenant-list strong,
+.tms-tenant-list span,
+.tms-tenant-cell strong,
+.tms-tenant-cell span,
+.tms-compact-list strong,
+.tms-compact-list span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tms-tenant-list span,
+.tms-tenant-cell span,
+.tms-compact-list span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.tms-filter-bar {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(240px, 1fr) 220px;
+}
+
+.tms-table-panel {
+  overflow: hidden;
+}
+
+.tms-table-head,
+.tms-table-row {
+  grid-template-columns: minmax(230px, 1.4fr) 120px 120px minmax(190px, 1fr) 100px;
+}
+
+.tms-table-head {
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  padding: 0 10px 10px;
+  text-transform: uppercase;
+}
+
+.tms-table-row {
+  border-bottom: 1px solid var(--line);
+  min-height: 74px;
+  padding: 10px;
+}
+
+.tms-table-row:hover,
+.tms-tenant-list a:hover {
+  background: var(--surface-strong);
+}
+
+.tms-table-row > strong {
+  color: var(--brand-dark);
+  font-size: 0.96rem;
+}
+
+.tms-tenant-cell {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.tms-logo-mark,
+.tms-profile-mark {
+  align-items: center;
+  border-radius: 8px;
+  color: white;
+  display: inline-flex;
+  font-weight: 950;
+  justify-content: center;
+}
+
+.tms-logo-mark {
+  height: 40px;
+  width: 40px;
+}
+
+.tms-row-usage {
+  min-width: 0;
+}
+
+.tms-create-modal {
+  max-width: 760px;
+}
+
+.tms-detail-hero {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+.tms-tenant-profile {
+  align-content: start;
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.tms-profile-mark {
+  font-size: 1.1rem;
+  height: 64px;
+  width: 64px;
+}
+
+.tms-profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.tms-detail-grid {
+  align-items: start;
+}
+
+.tms-compact-list,
+.tms-audit-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tms-compact-list > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 56px;
+  padding: 10px;
+}
+
+.tms-audit-list > div {
+  border-left: 3px solid var(--brand);
+  display: grid;
+  gap: 3px;
+  padding: 6px 0 6px 12px;
+}
+
+.tms-audit-list time {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 850;
+}
+
+.tms-audit-list strong {
+  color: var(--brand-dark);
+}
+
+.tms-audit-list span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.tms-audit-list-large {
+  gap: 12px;
+}
+
+@media (max-width: 1100px) {
+  .tms-dashboard-grid,
+  .tms-detail-hero,
+  .tms-detail-grid,
+  .tms-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .tms-table-head {
+    display: none;
+  }
+
+  .tms-table-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tms-row-usage {
+    width: 100%;
+  }
+}
+
+@media (max-width: 680px) {
+  .tms-usage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tms-tenant-profile {
+    grid-template-columns: 1fr;
+  }
+}

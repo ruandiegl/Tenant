@@ -1,11 +1,16 @@
 import { Navigate, NavLink, Route, BrowserRouter as Router, Routes, useLocation } from "react-router-dom";
 import { ChefHat, Menu as MenuIcon, ReceiptText, ShoppingBag, UserRound } from "lucide-react";
 import { AdminLayout } from "../app/layouts/admin-layout";
+import { SuperAdminLayout } from "../app/layouts/superadmin-layout";
 import { ProtectedRoute } from "./protected-route";
 import { AdminDashboard } from "../pages/admin/dashboard";
 import { AdminOrders } from "../pages/admin/orders";
 import { AdminMenu } from "../pages/admin/menu";
 import { AdminSettings } from "../pages/admin/settings";
+import { SuperAdminAuditLogs } from "../pages/superadmin/audit-logs";
+import { SuperAdminDashboard } from "../pages/superadmin/dashboard";
+import { SuperAdminTenantDetail } from "../pages/superadmin/tenant-detail";
+import { SuperAdminTenants } from "../pages/superadmin/tenants";
 import { KitchenQueue } from "../pages/kitchen/queue";
 import { CustomerMenu } from "../pages/customer/menu";
 import { CustomerCart } from "../pages/customer/cart";
@@ -38,7 +43,7 @@ function RouteShell() {
   const { order } = useCustomerFlow();
   const isAuthRoute = location.pathname === "/login";
   const isCustomerRoute = location.pathname.startsWith("/cliente");
-  const isAdminRoute = location.pathname.startsWith("/admin");
+  const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/superadmin");
   const navItems = isCustomerRoute ? customerNavItems : staffNavItems;
 
   return (
@@ -111,6 +116,46 @@ function RouteShell() {
                 <AdminLayout>
                   <AdminSettings />
                 </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin"
+            element={
+              <ProtectedRoute permission="platform.tenants.read">
+                <SuperAdminLayout>
+                  <SuperAdminDashboard />
+                </SuperAdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/tenants"
+            element={
+              <ProtectedRoute permission="platform.tenants.read">
+                <SuperAdminLayout>
+                  <SuperAdminTenants />
+                </SuperAdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/tenants/:id"
+            element={
+              <ProtectedRoute permission="platform.tenants.read">
+                <SuperAdminLayout>
+                  <SuperAdminTenantDetail />
+                </SuperAdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/audit-logs"
+            element={
+              <ProtectedRoute permission="platform.tenants.read">
+                <SuperAdminLayout>
+                  <SuperAdminAuditLogs />
+                </SuperAdminLayout>
               </ProtectedRoute>
             }
           />

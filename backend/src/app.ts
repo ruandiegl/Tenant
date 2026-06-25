@@ -15,7 +15,8 @@ import { kitchenRoutes } from "./modules/kitchen/kitchen.routes.js";
 import { tenantMenuRoutes, publicMenuRoutes } from "./modules/menu/menu.routes.js";
 import { tenantOrdersRoutes, publicOrdersRoutes } from "./modules/orders/orders.routes.js";
 import { reportsRoutes } from "./modules/reports/reports.routes.js";
-import { adminTenantRoutes, publicTenantRoutes } from "./modules/tenants/tenants.routes.js";
+import { publicTenantRoutes } from "./modules/tenants/tenants.routes.js";
+import { platformAuditRoutes, tenantManagementRoutes } from "./modules/tenant-management/tenant-management.routes.js";
 import { usersRoutes } from "./modules/users/users.routes.js";
 import { errorMiddleware } from "./shared/middlewares/error.middleware.js";
 
@@ -42,7 +43,8 @@ app.get("/health", async (_req, res, next) => {
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/auth", authRoutes);
 app.use("/tenants", publicTenantRoutes);
-app.use("/admin/tenants", adminTenantRoutes);
+app.use("/admin/tenants", tenantManagementRoutes);
+app.use("/admin/audit-logs", platformAuditRoutes);
 app.use("/tenant/users", usersRoutes);
 app.use("/tenant/branches", branchesRoutes);
 app.use("/tenant/menu", tenantMenuRoutes);

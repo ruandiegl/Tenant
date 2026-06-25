@@ -3,6 +3,8 @@ import { OrderStatus, PaymentStatus, ProductStatus } from "../../../types/databa
 
 const labels: Record<string, string> = {
   ACTIVE: "Ativo",
+  TRIAL: "Trial",
+  SUSPENDED: "Suspenso",
   INACTIVE: "Inativo",
   OUT_OF_STOCK: "Esgotado",
   ARCHIVED: "Arquivado",

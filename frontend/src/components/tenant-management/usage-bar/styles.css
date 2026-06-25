@@ -1,0 +1,57 @@
+.usage-bar {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.usage-bar div {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.usage-bar span,
+.usage-bar strong {
+  font-size: 0.82rem;
+}
+
+.usage-bar span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.usage-bar strong {
+  color: var(--brand-dark);
+  font-weight: 900;
+}
+
+.usage-bar meter {
+  appearance: none;
+  background: #e3ebe6;
+  border: 0;
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.usage-bar meter::-webkit-meter-bar {
+  background: #e3ebe6;
+  border: 0;
+  border-radius: 999px;
+}
+
+.usage-bar meter::-webkit-meter-optimum-value {
+  background: var(--brand);
+  border-radius: 999px;
+}
+
+.usage-warning meter::-webkit-meter-optimum-value {
+  background: var(--warning);
+}
+
+.usage-bar meter::-moz-meter-bar {
+  background: var(--brand);
+  border-radius: 999px;
+}

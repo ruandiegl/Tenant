@@ -1,0 +1,27 @@
+.plan-badge {
+  align-items: center;
+  background: #eef4f0;
+  border: 1px solid #d8e4dd;
+  border-radius: 999px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  font-size: 0.74rem;
+  font-weight: 900;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.plan-trial {
+  background: #fff5dd;
+  border-color: #f2d69a;
+  color: #79500d;
+}
+
+.plan-pro,
+.plan-enterprise {
+  background: #e6f5ec;
+  border-color: #badfc8;
+  color: var(--success);
+}

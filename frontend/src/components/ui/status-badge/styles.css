@@ -23,12 +23,14 @@
 .status-placed,
 .status-pending,
 .status-preparing,
-.status-queued {
+.status-queued,
+.status-trial {
   background: #fff4df;
   color: var(--warning);
 }
 
 .status-cancelled,
+.status-suspended,
 .status-failed,
 .status-out_of_stock,
 .status-delayed {
