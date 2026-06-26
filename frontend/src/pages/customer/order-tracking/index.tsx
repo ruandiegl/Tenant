@@ -1,13 +1,14 @@
 import "./styles.css";
 import { useQuery } from "@tanstack/react-query";
-import { BellRing, Bike, Clock, ReceiptText, RefreshCcw, ShoppingBag } from "lucide-react";
+import { BellRing, Bike, ReceiptText, RefreshCcw, ShoppingBag } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { useCustomerFlow } from "../../../app/providers/customer-flow-provider";
 import { useSocket } from "../../../app/providers/socket-provider";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { ordersService } from "../../../services/orders";
 import { OrderStatus } from "../../../types/database";
-import { formatCurrency, formatTime, minutesUntil } from "../../../utils/format";
+import { formatCurrency } from "../../../utils/format";
 import { DEFAULT_PUBLIC_TENANT_SLUG, publicTenantPath } from "../../../utils/public-tenant-route";
 
 const trackingSteps: Array<{ status: OrderStatus; label: string; description: string }> = [
@@ -28,6 +29,8 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
   const { tenantSlug = DEFAULT_PUBLIC_TENANT_SLUG, publicCode: publicCodeParam = "" } = useParams();
   const publicCode = publicCodeParam || publicCodeFallback;
   const socket = useSocket();
+  const { recentOrders } = useCustomerFlow();
+  const recentOrdersToShow = recentOrders.filter((recentOrder) => recentOrder.publicCode !== publicCode).slice(0, 6);
   const {
     data: order,
     isLoading,
@@ -71,6 +74,27 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
         </article>
       ) : null}
 
+      {recentOrdersToShow.length > 0 ? (
+        <article className="panel recent-orders-panel">
+          <h2>Pedidos recentes</h2>
+          <div className="recent-orders-list">
+            {recentOrdersToShow.map((recentOrder) => (
+              <Link
+                className="recent-order-card"
+                key={recentOrder.publicCode}
+                to={publicTenantPath(tenantSlug, `/pedido/${recentOrder.publicCode}`)}
+              >
+                <div>
+                  <strong>Pedido #{recentOrder.publicCode}</strong>
+                  <small>{formatCurrency(recentOrder.total)}</small>
+                </div>
+                <StatusBadge status={recentOrder.status} />
+              </Link>
+            ))}
+          </div>
+        </article>
+      ) : null}
+
       {order ? (
         <>
           <article className="panel tracking-summary">
@@ -78,11 +102,6 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
               <StatusBadge status={order.status} />
               <h2>{trackingSteps[Math.max(activeIndex, 0)]?.label ?? "Pedido em andamento"}</h2>
               <p className="muted-text">{trackingSteps[Math.max(activeIndex, 0)]?.description}</p>
-            </div>
-            <div className="tracking-estimate">
-              <Clock size={18} />
-              <span>{minutesUntil(order.estimatedReadyAt)} min</span>
-              <small>previsao {formatTime(order.estimatedReadyAt)}</small>
             </div>
           </article>
 

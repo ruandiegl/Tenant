@@ -198,6 +198,17 @@
   text-align: left;
 }
 
+.field-hint {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.field-hint-error {
+  color: var(--danger);
+}
+
 @media (min-width: 720px) {
   .checkout-grid {
     gap: 14px;

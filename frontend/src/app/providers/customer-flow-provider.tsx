@@ -1,4 +1,4 @@
-import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useCatalog } from "./catalog-provider";
 import { ordersService } from "../../services/orders";
@@ -64,6 +64,7 @@ type CustomerFlowContextValue = {
   payment: CustomerPaymentDraft;
   profile: CustomerProfileDraft;
   order: PlacedCustomerOrder | null;
+  recentOrders: PlacedCustomerOrder[];
   subtotal: number;
   deliveryFee: number;
   discountTotal: number;
@@ -109,6 +110,36 @@ const emptyProfile: CustomerProfileDraft = {
 
 const CustomerFlowContext = createContext<CustomerFlowContextValue | null>(null);
 
+type StoredCustomerFlow = {
+  items?: CustomerCartItem[];
+  address?: CustomerAddressDraft;
+  payment?: CustomerPaymentDraft;
+  profile?: CustomerProfileDraft;
+  order?: PlacedCustomerOrder | null;
+  recentOrders?: PlacedCustomerOrder[];
+};
+
+function getStorageKey(tenantSlug: string) {
+  return `podepedir.customerFlow.${tenantSlug}.v1`;
+}
+
+function readStoredFlow(tenantSlug: string): StoredCustomerFlow {
+  try {
+    const raw = window.localStorage.getItem(getStorageKey(tenantSlug));
+    return raw ? (JSON.parse(raw) as StoredCustomerFlow) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredFlow(tenantSlug: string, flow: StoredCustomerFlow) {
+  try {
+    window.localStorage.setItem(getStorageKey(tenantSlug), JSON.stringify(flow));
+  } catch {
+    // Storage can fail in private mode or full devices; the checkout still works in memory.
+  }
+}
+
 function createCartItem(product: Product, options: CustomerSelectedOption[] = [], notes = ""): CustomerCartItem {
   const optionsTotal = options.reduce((sum, option) => sum + option.unitPrice * option.quantity, 0);
 
@@ -128,16 +159,41 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
   const location = useLocation();
   const publicTenantSlug = getPublicTenantSlug(location.pathname) ?? DEFAULT_PUBLIC_TENANT_SLUG;
   const { decrementStock } = useCatalog();
-  const [items, setItems] = useState<CustomerCartItem[]>([]);
-  const [address, setAddress] = useState<CustomerAddressDraft>(emptyAddress);
-  const [payment, setPayment] = useState<CustomerPaymentDraft>(emptyPayment);
-  const [profile, setProfile] = useState<CustomerProfileDraft>(emptyProfile);
-  const [order, setOrder] = useState<PlacedCustomerOrder | null>(null);
+  const initialFlow = useMemo(() => readStoredFlow(publicTenantSlug), []);
+  const skipNextPersistRef = useRef(true);
+  const [items, setItems] = useState<CustomerCartItem[]>(initialFlow.items ?? []);
+  const [address, setAddress] = useState<CustomerAddressDraft>({ ...emptyAddress, ...initialFlow.address });
+  const [payment, setPayment] = useState<CustomerPaymentDraft>({ ...emptyPayment, ...initialFlow.payment });
+  const [profile, setProfile] = useState<CustomerProfileDraft>({ ...emptyProfile, ...initialFlow.profile });
+  const [order, setOrder] = useState<PlacedCustomerOrder | null>(initialFlow.order ?? null);
+  const [recentOrders, setRecentOrders] = useState<PlacedCustomerOrder[]>(initialFlow.recentOrders ?? []);
 
   useEffect(() => {
-    setItems([]);
-    setOrder(null);
+    const storedFlow = readStoredFlow(publicTenantSlug);
+    skipNextPersistRef.current = true;
+    setItems(storedFlow.items ?? []);
+    setAddress({ ...emptyAddress, ...storedFlow.address });
+    setPayment({ ...emptyPayment, ...storedFlow.payment });
+    setProfile({ ...emptyProfile, ...storedFlow.profile });
+    setOrder(storedFlow.order ?? null);
+    setRecentOrders(storedFlow.recentOrders ?? []);
   }, [publicTenantSlug]);
+
+  useEffect(() => {
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return;
+    }
+
+    writeStoredFlow(publicTenantSlug, {
+      items,
+      address,
+      payment,
+      profile,
+      order,
+      recentOrders
+    });
+  }, [address, items, order, payment, profile, publicTenantSlug, recentOrders]);
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -159,6 +215,7 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
       payment,
       profile,
       order,
+      recentOrders,
       ...totals,
       addProduct: (product, options = [], notes = "") => {
         setOrder(null);
@@ -245,6 +302,10 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
 
         items.forEach((item) => decrementStock(item.productId, item.quantity));
         setOrder(nextOrder);
+        setRecentOrders((current) => [
+          nextOrder,
+          ...current.filter((storedOrder) => storedOrder.publicCode !== nextOrder.publicCode)
+        ].slice(0, 8));
         setItems([]);
 
         return nextOrder;
@@ -253,7 +314,7 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
         setOrder(null);
       }
     }),
-    [address, decrementStock, items, order, payment, profile, publicTenantSlug, totals]
+    [address, decrementStock, items, order, payment, profile, publicTenantSlug, recentOrders, totals]
   );
 
   return <CustomerFlowContext.Provider value={value}>{children}</CustomerFlowContext.Provider>;

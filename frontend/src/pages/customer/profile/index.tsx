@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Mail, Phone, UserRound } from "lucide-react";
 import { useCustomerFlow } from "../../../app/providers/customer-flow-provider";
 import { PageHeader } from "../../../components/ui/page-header";
+import { formatPhone } from "../../../utils/input-masks";
 import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../../../utils/public-tenant-route";
 
 export function CustomerProfile() {
@@ -50,7 +51,13 @@ export function CustomerProfile() {
           <span>WhatsApp</span>
           <div>
             <Phone size={18} />
-            <input value={profile.phone} onChange={(event) => updateProfile({ phone: event.target.value })} placeholder="(11) 90000-0000" />
+            <input
+              autoComplete="tel"
+              inputMode="tel"
+              value={profile.phone}
+              onChange={(event) => updateProfile({ phone: formatPhone(event.target.value) })}
+              placeholder="(11) 90000-0000"
+            />
           </div>
         </label>
 

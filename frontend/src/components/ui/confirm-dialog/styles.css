@@ -3,8 +3,9 @@
 }
 
 .confirm-dialog {
-  gap: 18px;
-  max-width: 480px;
+  gap: 20px;
+  max-width: 500px;
+  padding: 20px;
 }
 
 .confirm-dialog-header {
@@ -15,7 +16,8 @@
 }
 
 .confirm-dialog-header h2 {
-  font-size: 1.12rem;
+  color: var(--text);
+  font-size: 1.18rem;
   letter-spacing: 0;
   margin: 0;
 }
@@ -29,25 +31,35 @@
 
 .confirm-dialog-mark {
   align-items: center;
-  background: #fff0ed;
-  border: 1px solid #ffd0c8;
   border-radius: 8px;
-  color: var(--danger);
   display: inline-flex;
   height: 42px;
   justify-content: center;
   width: 42px;
 }
 
+.confirm-dialog-mark-danger {
+  background: #fff0ed;
+  border: 1px solid #ffd0c8;
+  color: var(--danger);
+}
+
+.confirm-dialog-mark-neutral {
+  background: #eaf7ee;
+  border: 1px solid #b9dfc6;
+  color: var(--brand-dark);
+}
+
 .confirm-dialog-actions {
+  border-top: 1px solid var(--line);
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  padding-top: 14px;
 }
 
-.danger-button {
+.confirm-action-button {
   align-items: center;
-  background: var(--danger);
   border: 0;
   border-radius: 8px;
   color: white;
@@ -61,7 +73,15 @@
   padding: 0 14px;
 }
 
-.danger-button:disabled,
+.confirm-action-danger {
+  background: var(--danger);
+}
+
+.confirm-action-neutral {
+  background: var(--brand-dark);
+}
+
+.confirm-action-button:disabled,
 .confirm-dialog-actions .ghost-icon-button:disabled {
   cursor: wait;
   opacity: 0.72;

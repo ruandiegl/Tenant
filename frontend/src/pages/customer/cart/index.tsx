@@ -1,13 +1,14 @@
 import "./styles.css";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bike, ChevronLeft, CreditCard, Minus, Plus, ReceiptText, Trash2, UserRound, WalletCards } from "lucide-react";
+import { Bike, ChevronLeft, CreditCard, MapPin, Minus, Phone, Plus, ReceiptText, Trash2, UserRound, WalletCards } from "lucide-react";
 import { toast } from "react-toastify";
 import { useCustomerFlow } from "../../../app/providers/customer-flow-provider";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
-import { formatCurrency, formatTime } from "../../../utils/format";
+import { formatCurrency } from "../../../utils/format";
+import { formatCep, formatPhone, onlyDigits } from "../../../utils/input-masks";
 import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../../../utils/public-tenant-route";
 
 type CheckoutStep = "cart" | "address" | "payment" | "done";
@@ -39,6 +40,9 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
   } = useCustomerFlow();
   const [error, setError] = useState<string | null>(null);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [isLookingUpCep, setIsLookingUpCep] = useState(false);
+  const [cepLookupError, setCepLookupError] = useState<string | null>(null);
+  const lastCepLookupRef = useRef("");
   const [cartItemPendingDelete, setCartItemPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const missingAddress = useMemo(
@@ -57,6 +61,58 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
         : step === "payment"
           ? "Escolha a forma de pagamento para confirmar."
           : "Seu pedido foi recebido pela loja.";
+
+  useEffect(() => {
+    const cep = onlyDigits(address.postalCode);
+
+    if (cep.length < 8) {
+      setCepLookupError(null);
+      setIsLookingUpCep(false);
+      return;
+    }
+
+    if (lastCepLookupRef.current === cep) return;
+
+    lastCepLookupRef.current = cep;
+    const controller = new AbortController();
+    setIsLookingUpCep(true);
+    setCepLookupError(null);
+
+    fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("CEP indisponivel");
+        return response.json() as Promise<{
+          erro?: boolean;
+          logradouro?: string;
+          bairro?: string;
+          localidade?: string;
+          uf?: string;
+        }>;
+      })
+      .then((data) => {
+        if (data.erro) {
+          setCepLookupError("CEP nao encontrado.");
+          return;
+        }
+
+        updateAddress({
+          ...(data.logradouro ? { street: data.logradouro } : {}),
+          ...(data.bairro ? { district: data.bairro } : {}),
+          ...(data.localidade ? { city: data.localidade } : {}),
+          ...(data.uf ? { state: data.uf } : {})
+        });
+      })
+      .catch((lookupError) => {
+        if ((lookupError as Error).name !== "AbortError") {
+          setCepLookupError("Nao foi possivel buscar o CEP.");
+        }
+      })
+      .finally(() => {
+        setIsLookingUpCep(false);
+      });
+
+    return () => controller.abort();
+  }, [address.postalCode, updateAddress]);
 
   const nextStep = () => {
     setError(null);
@@ -261,9 +317,30 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
               <label className="field">
                 <span>WhatsApp</span>
                 <div>
-                  <UserRound size={18} />
-                  <input value={profile.phone} onChange={(event) => updateProfile({ phone: event.target.value })} placeholder="(11) 90000-0000" />
+                  <Phone size={18} />
+                  <input
+                    autoComplete="tel"
+                    inputMode="tel"
+                    value={profile.phone}
+                    onChange={(event) => updateProfile({ phone: formatPhone(event.target.value) })}
+                    placeholder="(11) 90000-0000"
+                  />
                 </div>
+              </label>
+              <label className="field">
+                <span>CEP</span>
+                <div>
+                  <MapPin size={18} />
+                  <input
+                    autoComplete="postal-code"
+                    inputMode="numeric"
+                    value={address.postalCode}
+                    onChange={(event) => updateAddress({ postalCode: formatCep(event.target.value) })}
+                    placeholder="00000-000"
+                  />
+                </div>
+                {isLookingUpCep ? <small className="field-hint">Buscando endereco...</small> : null}
+                {cepLookupError ? <small className="field-hint field-hint-error">{cepLookupError}</small> : null}
               </label>
               <label className="field">
                 <span>Rua</span>
@@ -295,13 +372,6 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                 <div>
                   <Bike size={18} />
                   <input value={address.district} onChange={(event) => updateAddress({ district: event.target.value })} placeholder="Bairro" />
-                </div>
-              </label>
-              <label className="field">
-                <span>CEP</span>
-                <div>
-                  <Bike size={18} />
-                  <input value={address.postalCode} onChange={(event) => updateAddress({ postalCode: event.target.value })} placeholder="00000-000" />
                 </div>
               </label>
               <label className="field">
@@ -424,9 +494,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
           <article className="panel success-panel">
             <StatusBadge status={order.status} />
             <h2>Pedido #{order.publicCode}</h2>
-            <p className="muted-text">
-              Pagamento por {paymentLabel}. Previsao de preparo: {formatTime(order.estimatedReadyAt)}.
-            </p>
+            <p className="muted-text">Pagamento por {paymentLabel}. A loja recebeu seu pedido e vai atualizar o andamento.</p>
             <div className="timeline">
               {["PLACED", "ACCEPTED", "PREPARING"].map((status) => (
                 <div className="active" key={status}>

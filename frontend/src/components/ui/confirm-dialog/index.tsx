@@ -1,4 +1,4 @@
-import { AlertTriangle, Loader2, X } from "lucide-react";
+import { AlertTriangle, Loader2, LogOut, X } from "lucide-react";
 import "./styles.css";
 
 type ConfirmDialogProps = {
@@ -7,6 +7,7 @@ type ConfirmDialogProps = {
   description: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  tone?: "danger" | "neutral";
   isLoading?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -18,18 +19,26 @@ export function ConfirmDialog({
   description,
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
+  tone = "danger",
   isLoading = false,
   onCancel,
   onConfirm
 }: ConfirmDialogProps) {
   if (!open) return null;
+  const Icon = tone === "neutral" ? LogOut : AlertTriangle;
 
   return (
-    <div className="modal-backdrop confirm-dialog-backdrop" role="presentation">
-      <section className="modal-card confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+    <div className="modal-backdrop confirm-dialog-backdrop" role="presentation" onMouseDown={isLoading ? undefined : onCancel}>
+      <section
+        className="modal-card confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header className="confirm-dialog-header">
-          <span className="confirm-dialog-mark" aria-hidden="true">
-            <AlertTriangle size={20} />
+          <span className={`confirm-dialog-mark confirm-dialog-mark-${tone}`} aria-hidden="true">
+            <Icon size={20} />
           </span>
           <div>
             <h2 id="confirm-dialog-title">{title}</h2>
@@ -44,7 +53,7 @@ export function ConfirmDialog({
           <button className="ghost-icon-button" disabled={isLoading} onClick={onCancel} type="button">
             {cancelLabel}
           </button>
-          <button className="danger-button" disabled={isLoading} onClick={onConfirm} type="button">
+          <button className={`confirm-action-button confirm-action-${tone}`} disabled={isLoading} onClick={onConfirm} type="button">
             {isLoading ? <Loader2 className="spin" size={18} /> : null}
             {confirmLabel}
           </button>

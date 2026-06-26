@@ -8,28 +8,6 @@
   margin: 10px 0 4px;
 }
 
-.tracking-estimate {
-  align-items: center;
-  background: var(--surface-strong);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  display: grid;
-  gap: 4px;
-  justify-items: start;
-  padding: 12px;
-}
-
-.tracking-estimate span {
-  color: var(--brand-dark);
-  font-size: 1.5rem;
-  font-family: var(--font-data);
-  font-weight: 800;
-}
-
-.tracking-estimate small {
-  color: var(--muted);
-}
-
 .tracking-steps {
   display: grid;
   gap: 0;
@@ -119,6 +97,45 @@
   display: flex;
   gap: 7px;
   min-width: 0;
+}
+
+.recent-orders-panel {
+  gap: 12px;
+}
+
+.recent-orders-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recent-order-card {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+  text-decoration: none;
+}
+
+.recent-order-card > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.recent-order-card strong {
+  font-family: var(--font-customer);
+  font-weight: 800;
+}
+
+.recent-order-card small {
+  color: var(--muted);
+  font-family: var(--font-data);
+  font-weight: 800;
 }
 
 .grand-total {

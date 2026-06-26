@@ -1,8 +1,9 @@
 import "./styles.css";
-import { PropsWithChildren } from "react";
+import { PropsWithChildren, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Building2, ClipboardList, LayoutDashboard, LogOut, PackageCheck, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "../../../components/brand-logo";
+import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { useAuth } from "../../providers/auth-provider";
 
 const navItems = [
@@ -15,10 +16,18 @@ const navItems = [
 export function SuperAdminLayout({ children }: PropsWithChildren) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    navigate("/login", { replace: true });
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+      setLogoutModalOpen(false);
+    }
   };
 
   return (
@@ -47,12 +56,22 @@ export function SuperAdminLayout({ children }: PropsWithChildren) {
             <strong>{user?.name ?? "Operador"}</strong>
             <span>{user?.email ?? "superadmin@podepedir.local"}</span>
           </div>
-          <button aria-label="Sair do superadmin" onClick={handleLogout} type="button">
+          <button aria-label="Sair do superadmin" onClick={() => setLogoutModalOpen(true)} type="button">
             <LogOut size={18} />
           </button>
         </div>
       </aside>
       <section className="superadmin-content">{children}</section>
+      <ConfirmDialog
+        open={logoutModalOpen}
+        title="Sair do superadmin"
+        description="Voce sera desconectado do console da plataforma e voltara para a tela de login."
+        confirmLabel="Sair"
+        tone="neutral"
+        isLoading={isLoggingOut}
+        onCancel={() => setLogoutModalOpen(false)}
+        onConfirm={() => void handleLogout()}
+      />
     </div>
   );
 }

@@ -1,8 +1,9 @@
 import "./styles.css";
-import { PropsWithChildren } from "react";
+import { PropsWithChildren, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { BarChart3, ChefHat, LogOut, Menu as MenuIcon, ReceiptText, Settings, Store } from "lucide-react";
 import { BrandLogo } from "../../../components/brand-logo";
+import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { useAuth } from "../../providers/auth-provider";
 import { useTenant } from "../../providers/tenant-provider";
 
@@ -18,10 +19,18 @@ export function AdminLayout({ children }: PropsWithChildren) {
   const { settings } = useTenant();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    navigate("/login", { replace: true });
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+      setLogoutModalOpen(false);
+    }
   };
 
   return (
@@ -53,7 +62,7 @@ export function AdminLayout({ children }: PropsWithChildren) {
               <strong>{user?.name ?? "Admin"}</strong>
               <span>{user?.email ?? "admin@podepedir.local"}</span>
             </div>
-            <button aria-label="Sair do admin" onClick={handleLogout}>
+            <button aria-label="Sair do admin" onClick={() => setLogoutModalOpen(true)}>
               <LogOut size={18} />
             </button>
           </div>
@@ -65,6 +74,16 @@ export function AdminLayout({ children }: PropsWithChildren) {
       </aside>
 
       <section className="admin-content">{children}</section>
+      <ConfirmDialog
+        open={logoutModalOpen}
+        title="Sair da conta"
+        description="Voce sera desconectado deste painel e precisara entrar novamente para acessar a administracao."
+        confirmLabel="Sair"
+        tone="neutral"
+        isLoading={isLoggingOut}
+        onCancel={() => setLogoutModalOpen(false)}
+        onConfirm={() => void handleLogout()}
+      />
     </div>
   );
 }
