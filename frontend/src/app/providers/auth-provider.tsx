@@ -42,7 +42,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      isAuthenticated: Boolean(user),
+      isAuthenticated: hasToken && Boolean(user),
       isLoading: hasToken && isLoading,
       login: async (credentials) => {
         const nextUser = await loginMutation.mutateAsync(credentials);
@@ -50,8 +50,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return nextUser;
       },
       logout: async () => {
-        await authService.logout();
         setHasToken(false);
+        await authService.logout();
+        await queryClient.cancelQueries();
+        queryClient.setQueryData(["auth", "me"], null);
         queryClient.removeQueries({ queryKey: ["auth"] });
         queryClient.removeQueries({ queryKey: ["tenant"] });
         queryClient.removeQueries({ queryKey: ["admin-orders"] });
@@ -61,12 +63,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
         queryClient.removeQueries({ queryKey: ["order-details"] });
       },
       can: (permission) => {
-        if (!user) return false;
+        if (!hasToken || !user) return false;
 
         return user.permissions.includes(permission);
       },
       hasPlanCapability: (capability) => {
-        if (!user || user.isPlatformAdmin) return true;
+        if (!hasToken || !user || user.isPlatformAdmin) return true;
 
         return user.plan?.capabilities?.[capability] ?? true;
       }

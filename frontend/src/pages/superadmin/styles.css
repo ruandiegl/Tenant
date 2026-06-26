@@ -280,6 +280,10 @@
   align-items: start;
 }
 
+.tms-edit-submit {
+  grid-column: 1 / -1;
+}
+
 .tms-compact-list,
 .tms-audit-list {
   display: grid;

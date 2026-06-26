@@ -43,6 +43,14 @@ export type CustomerPaymentDraft = {
   changeFor: string;
 };
 
+export type CustomerFulfillmentDraft = {
+  type: "DELIVERY" | "PICKUP";
+  deliveryFee: number;
+  zoneId?: string;
+  zoneName?: string;
+  estimatedMinutes?: number;
+};
+
 export type CustomerProfileDraft = {
   name: string;
   email: string;
@@ -61,6 +69,7 @@ export type PlacedCustomerOrder = {
 type CustomerFlowContextValue = {
   items: CustomerCartItem[];
   address: CustomerAddressDraft;
+  fulfillment: CustomerFulfillmentDraft;
   payment: CustomerPaymentDraft;
   profile: CustomerProfileDraft;
   order: PlacedCustomerOrder | null;
@@ -74,6 +83,7 @@ type CustomerFlowContextValue = {
   decrementItem: (itemId: string) => void;
   removeItem: (itemId: string) => void;
   updateItemNotes: (itemId: string, notes: string) => void;
+  updateFulfillment: (fulfillment: Partial<CustomerFulfillmentDraft>) => void;
   updateAddress: (address: Partial<CustomerAddressDraft>) => void;
   updatePayment: (payment: Partial<CustomerPaymentDraft>) => void;
   updateProfile: (profile: Partial<CustomerProfileDraft>) => void;
@@ -101,6 +111,11 @@ const emptyPayment: CustomerPaymentDraft = {
   changeFor: ""
 };
 
+const emptyFulfillment: CustomerFulfillmentDraft = {
+  type: "DELIVERY",
+  deliveryFee: 8
+};
+
 const emptyProfile: CustomerProfileDraft = {
   name: "",
   email: "",
@@ -113,6 +128,7 @@ const CustomerFlowContext = createContext<CustomerFlowContextValue | null>(null)
 type StoredCustomerFlow = {
   items?: CustomerCartItem[];
   address?: CustomerAddressDraft;
+  fulfillment?: CustomerFulfillmentDraft;
   payment?: CustomerPaymentDraft;
   profile?: CustomerProfileDraft;
   order?: PlacedCustomerOrder | null;
@@ -163,6 +179,7 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
   const skipNextPersistRef = useRef(true);
   const [items, setItems] = useState<CustomerCartItem[]>(initialFlow.items ?? []);
   const [address, setAddress] = useState<CustomerAddressDraft>({ ...emptyAddress, ...initialFlow.address });
+  const [fulfillment, setFulfillment] = useState<CustomerFulfillmentDraft>({ ...emptyFulfillment, ...initialFlow.fulfillment });
   const [payment, setPayment] = useState<CustomerPaymentDraft>({ ...emptyPayment, ...initialFlow.payment });
   const [profile, setProfile] = useState<CustomerProfileDraft>({ ...emptyProfile, ...initialFlow.profile });
   const [order, setOrder] = useState<PlacedCustomerOrder | null>(initialFlow.order ?? null);
@@ -173,6 +190,7 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
     skipNextPersistRef.current = true;
     setItems(storedFlow.items ?? []);
     setAddress({ ...emptyAddress, ...storedFlow.address });
+    setFulfillment({ ...emptyFulfillment, ...storedFlow.fulfillment });
     setPayment({ ...emptyPayment, ...storedFlow.payment });
     setProfile({ ...emptyProfile, ...storedFlow.profile });
     setOrder(storedFlow.order ?? null);
@@ -188,16 +206,17 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
     writeStoredFlow(publicTenantSlug, {
       items,
       address,
+      fulfillment,
       payment,
       profile,
       order,
       recentOrders
     });
-  }, [address, items, order, payment, profile, publicTenantSlug, recentOrders]);
+  }, [address, fulfillment, items, order, payment, profile, publicTenantSlug, recentOrders]);
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-    const deliveryFee = subtotal > 0 ? 8 : 0;
+    const deliveryFee = subtotal > 0 && fulfillment.type === "DELIVERY" ? fulfillment.deliveryFee : 0;
     const discountTotal = subtotal >= 45 ? 7 : 0;
 
     return {
@@ -206,12 +225,13 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
       discountTotal,
       total: Math.max(0, subtotal + deliveryFee - discountTotal)
     };
-  }, [items]);
+  }, [fulfillment.deliveryFee, fulfillment.type, items]);
 
   const value = useMemo<CustomerFlowContextValue>(
     () => ({
       items,
       address,
+      fulfillment,
       payment,
       profile,
       order,
@@ -251,6 +271,9 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
       updateItemNotes: (itemId, notes) => {
         setItems((current) => current.map((item) => (item.id === itemId ? { ...item, notes } : item)));
       },
+      updateFulfillment: (nextFulfillment) => {
+        setFulfillment((current) => ({ ...current, ...nextFulfillment }));
+      },
       updateAddress: (nextAddress) => {
         setAddress((current) => ({ ...current, ...nextAddress }));
       },
@@ -263,22 +286,25 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
       placeOrder: async () => {
         const createdOrder = await ordersService.createPublicOrder(
           {
-            type: "DELIVERY",
+            type: fulfillment.type,
             customerName: profile.name,
             customerPhone: profile.phone || undefined,
             customerEmail: profile.email || undefined,
             deliveryFee: totals.deliveryFee,
-            notes: `Pagamento selecionado: ${payment.type}`,
-            deliveryAddress: {
-              street: address.street,
-              number: address.number,
-              complement: address.complement || undefined,
-              district: address.district,
-              city: address.city,
-              state: address.state,
-              postalCode: address.postalCode,
-              reference: address.reference || undefined
-            },
+            notes: `Pagamento selecionado: ${payment.type}${fulfillment.type === "PICKUP" ? " | Retirada na loja" : fulfillment.zoneName ? ` | Entrega: ${fulfillment.zoneName}` : ""}`,
+            deliveryAddress:
+              fulfillment.type === "DELIVERY"
+                ? {
+                    street: address.street,
+                    number: address.number,
+                    complement: address.complement || undefined,
+                    district: address.district,
+                    city: address.city,
+                    state: address.state,
+                    postalCode: address.postalCode,
+                    reference: address.reference || undefined
+                  }
+                : undefined,
             items: items.map((item) => ({
               productId: item.productId,
               quantity: item.quantity,
@@ -314,7 +340,7 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
         setOrder(null);
       }
     }),
-    [address, decrementStock, items, order, payment, profile, publicTenantSlug, recentOrders, totals]
+    [address, decrementStock, fulfillment, items, order, payment, profile, publicTenantSlug, recentOrders, totals]
   );
 
   return <CustomerFlowContext.Provider value={value}>{children}</CustomerFlowContext.Provider>;

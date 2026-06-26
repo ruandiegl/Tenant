@@ -4,9 +4,11 @@ import { AdminLayout } from "../app/layouts/admin-layout";
 import { SuperAdminLayout } from "../app/layouts/superadmin-layout";
 import { ProtectedRoute } from "./protected-route";
 import { AdminDashboard } from "../pages/admin/dashboard";
+import { AdminDeliveries } from "../pages/admin/deliveries";
 import { AdminOrders } from "../pages/admin/orders";
 import { AdminMenu } from "../pages/admin/menu";
 import { AdminSettings } from "../pages/admin/settings";
+import { AdminWhatsapp } from "../pages/admin/whatsapp";
 import { SuperAdminAuditLogs } from "../pages/superadmin/audit-logs";
 import { SuperAdminDashboard } from "../pages/superadmin/dashboard";
 import { SuperAdminPlans } from "../pages/superadmin/plans";
@@ -112,6 +114,26 @@ function RouteShell() {
             }
           />
           <Route
+            path="/admin/entregas"
+            element={
+              <ProtectedRoute permission="tenant.branches.read">
+                <AdminLayout>
+                  <AdminDeliveries />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/whatsapp"
+            element={
+              <ProtectedRoute permission="tenant.settings.read">
+                <AdminLayout>
+                  <AdminWhatsapp />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin/config"
             element={
               <ProtectedRoute permission="tenant.branches.read">
@@ -137,6 +159,16 @@ function RouteShell() {
               <ProtectedRoute permission="platform.tenants.read" platformOnly>
                 <SuperAdminLayout>
                   <SuperAdminTenants />
+                </SuperAdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/tenants/:id/editar"
+            element={
+              <ProtectedRoute permission="platform.tenants.read" platformOnly>
+                <SuperAdminLayout>
+                  <SuperAdminTenantDetail />
                 </SuperAdminLayout>
               </ProtectedRoute>
             }

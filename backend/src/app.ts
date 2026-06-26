@@ -11,6 +11,7 @@ import { auditRoutes } from "./modules/audit/audit.routes.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { branchesRoutes } from "./modules/branches/branches.routes.js";
 import { couponsRoutes } from "./modules/coupons/coupons.routes.js";
+import { deliveryZonesRoutes, publicDeliveryZonesRoutes } from "./modules/delivery-zones/delivery-zones.routes.js";
 import { kitchenRoutes } from "./modules/kitchen/kitchen.routes.js";
 import { tenantMenuRoutes, publicMenuRoutes } from "./modules/menu/menu.routes.js";
 import { tenantOrdersRoutes, publicOrdersRoutes } from "./modules/orders/orders.routes.js";
@@ -19,6 +20,7 @@ import { publicTenantRoutes } from "./modules/tenants/tenants.routes.js";
 import { platformAuditRoutes, tenantManagementRoutes } from "./modules/tenant-management/tenant-management.routes.js";
 import { tenantSettingsRoutes } from "./modules/tenant-settings/tenant-settings.routes.js";
 import { usersRoutes } from "./modules/users/users.routes.js";
+import { publicWhatsappRoutes, tenantWhatsappRoutes } from "./modules/whatsapp/whatsapp.routes.js";
 import { errorMiddleware } from "./shared/middlewares/error.middleware.js";
 
 const nodeRequire = createRequire(import.meta.url);
@@ -28,7 +30,7 @@ export const app = express();
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
-app.use(express.json({ limit: "8mb" }));
+app.use(express.json({ limit: "8mb", verify: (req, _res, buffer) => { (req as express.Request).rawBody = Buffer.from(buffer); } }));
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
@@ -53,10 +55,14 @@ app.use("/tenant/menu", tenantMenuRoutes);
 app.use("/tenant/orders", tenantOrdersRoutes);
 app.use("/tenant/kitchen", kitchenRoutes);
 app.use("/tenant/coupons", couponsRoutes);
+app.use("/tenant/delivery-zones", deliveryZonesRoutes);
 app.use("/tenant/reports", reportsRoutes);
 app.use("/tenant/audit-logs", auditRoutes);
+app.use("/tenant/whatsapp", tenantWhatsappRoutes);
 app.use("/public", publicMenuRoutes);
 app.use("/public", publicOrdersRoutes);
+app.use("/public", publicWhatsappRoutes);
+app.use("/public", publicDeliveryZonesRoutes);
 
 app.use(errorMiddleware);
 

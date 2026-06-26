@@ -379,9 +379,9 @@ export function SuperAdminTenants() {
               <Link className="tms-action-button" title="Ver tenant" to={`/superadmin/tenants/${tenant.id}`}>
                 <Eye size={16} />
               </Link>
-              <button className="tms-action-button" onClick={() => openEdit(tenant)} title="Editar tenant" type="button">
+              <Link className="tms-action-button" title="Editar tenant" to={`/superadmin/tenants/${tenant.id}/editar`}>
                 <Edit3 size={16} />
-              </button>
+              </Link>
               <button className="tms-action-button danger" onClick={() => handleDelete(tenant)} title="Deletar tenant" type="button">
                 <Trash2 size={16} />
               </button>

@@ -1,7 +1,7 @@
 import "./styles.css";
 import { PropsWithChildren, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { BarChart3, ChefHat, LogOut, Menu as MenuIcon, ReceiptText, Settings, Store } from "lucide-react";
+import { BarChart3, Bike, ChefHat, LogOut, Menu as MenuIcon, MessageCircle, ReceiptText, Settings, Store } from "lucide-react";
 import { BrandLogo } from "../../../components/brand-logo";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { useAuth } from "../../providers/auth-provider";
@@ -12,6 +12,8 @@ const adminNavItems = [
   { to: "/admin/pedidos", label: "Pedidos", icon: ReceiptText },
   { to: "/admin/cardapio", label: "Cardapio", icon: MenuIcon },
   { to: "/admin/cozinha", label: "Cozinha", icon: ChefHat },
+  { to: "/admin/entregas", label: "Entregas", icon: Bike },
+  { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/config", label: "Configuracoes", icon: Settings }
 ];
 

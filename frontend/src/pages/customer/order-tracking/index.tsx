@@ -150,11 +150,13 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
             </article>
 
             <article className="panel">
-              <h2>Entrega</h2>
+              <h2>{order.type === "PICKUP" ? "Retirada" : "Entrega"}</h2>
               {address ? (
                 <p className="muted-text">
                   <Bike size={16} /> {address.street}, {address.number} - {address.district}
                 </p>
+              ) : order.type === "PICKUP" ? (
+                <p className="muted-text">Pedido marcado para retirada na loja.</p>
               ) : (
                 <p className="muted-text">Pedido sem endereco de entrega.</p>
               )}
@@ -169,7 +171,7 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
                 <strong>{formatCurrency(order.subtotal)}</strong>
               </div>
               <div>
-                <span>Entrega</span>
+                <span>{order.type === "PICKUP" ? "Retirada" : "Entrega"}</span>
                 <strong>{formatCurrency(order.deliveryFee)}</strong>
               </div>
               <div>

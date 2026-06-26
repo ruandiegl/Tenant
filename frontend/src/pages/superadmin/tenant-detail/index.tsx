@@ -1,14 +1,14 @@
 import "../styles.css";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarClock, Copy, Loader2, Save, ShieldAlert, Store, Users } from "lucide-react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import { ArrowLeft, CalendarClock, Copy, Edit3, Eye, Loader2, Save, ShieldAlert, Store, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { PlanBadge } from "../../../components/tenant-management/plan-badge";
 import { UsageBar } from "../../../components/tenant-management/usage-bar";
-import { tenantManagementService } from "../../../services/tenant-management";
+import { TenantUpdatePayload, tenantManagementService } from "../../../services/tenant-management";
 import { TenantStatus } from "../../../types/database";
 
 const statusOptions: Array<{ value: TenantStatus; label: string }> = [
@@ -18,13 +18,45 @@ const statusOptions: Array<{ value: TenantStatus; label: string }> = [
   { value: "CANCELLED", label: "Cancelado" }
 ];
 
+const initialEditForm: TenantUpdatePayload = {
+  name: "",
+  legalName: "",
+  document: "",
+  email: "",
+  phone: "",
+  settings: {
+    brandName: "",
+    description: "",
+    slogan: "",
+    businessType: "",
+    cuisineCategory: "",
+    websiteUrl: "",
+    instagramUrl: "",
+    whatsapp: "",
+    logoUrl: "",
+    coverImageUrl: "",
+    primaryColor: "#1a6b3b",
+    secondaryColor: "#27ae51",
+    themeFontFamily: "Inter",
+    welcomeMessage: ""
+  }
+};
+
+function clean(value?: string | null) {
+  const next = value?.trim();
+  return next ? next : undefined;
+}
+
 export function SuperAdminTenantDetail() {
   const { id = "" } = useParams();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  const isEditing = location.pathname.endsWith("/editar");
   const [status, setStatus] = useState<TenantStatus>("SUSPENDED");
   const [statusReason, setStatusReason] = useState("");
   const [planId, setPlanId] = useState("");
   const [planReason, setPlanReason] = useState("");
+  const [editForm, setEditForm] = useState<TenantUpdatePayload>(initialEditForm);
   const { data: tenant, isLoading } = useQuery({
     queryKey: ["tenant-management", "tenant", id],
     queryFn: () => tenantManagementService.getTenant(id),
@@ -34,32 +66,56 @@ export function SuperAdminTenantDetail() {
     queryKey: ["tenant-management", "plans"],
     queryFn: tenantManagementService.listPlans
   });
-  const activePlans = plans.filter((plan) => plan.status === "ACTIVE");
+  const activePlans = useMemo(() => plans.filter((plan) => plan.status === "ACTIVE"), [plans]);
 
   useEffect(() => {
-    if (tenant?.plan.id) {
-      setPlanId(tenant.plan.id);
-      return;
-    }
+    if (!tenant) return;
 
-    if (!planId && activePlans[0]?.id) {
-      setPlanId(activePlans[0].id);
-    }
-  }, [activePlans, planId, tenant?.plan.id]);
+    setStatus(tenant.status);
+    setPlanId(tenant.plan.id ?? activePlans[0]?.id ?? "");
+    setEditForm({
+      name: tenant.name,
+      legalName: tenant.legalName ?? "",
+      document: tenant.document ?? "",
+      email: tenant.email ?? "",
+      phone: tenant.phone ?? "",
+      settings: {
+        brandName: tenant.settings?.brandName ?? tenant.name,
+        legalName: tenant.legalName ?? "",
+        description: tenant.settings?.description ?? "",
+        slogan: tenant.settings?.slogan ?? "",
+        businessType: tenant.settings?.businessType ?? "",
+        cuisineCategory: tenant.settings?.cuisineCategory ?? "",
+        websiteUrl: tenant.settings?.websiteUrl ?? "",
+        instagramUrl: tenant.settings?.instagramUrl ?? "",
+        whatsapp: tenant.settings?.whatsapp ?? "",
+        logoUrl: tenant.settings?.logoUrl ?? "",
+        coverImageUrl: tenant.settings?.coverImageUrl ?? "",
+        primaryColor: tenant.settings?.primaryColor ?? "#1a6b3b",
+        secondaryColor: tenant.settings?.secondaryColor ?? "#27ae51",
+        themeFontFamily: tenant.settings?.themeFontFamily ?? "Inter",
+        welcomeMessage: tenant.settings?.welcomeMessage ?? ""
+      }
+    });
+  }, [activePlans, tenant]);
   const statusMutation = useMutation({
     mutationFn: () => tenantManagementService.updateTenantStatus(id, { status, reason: statusReason }),
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
       toast.success("Status atualizado.");
       setStatusReason("");
+      setStatus(updated.status);
+      queryClient.setQueryData(["tenant-management", "tenant", id], updated);
       await queryClient.invalidateQueries({ queryKey: ["tenant-management"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel alterar o status.")
   });
   const planMutation = useMutation({
     mutationFn: () => tenantManagementService.updateTenantPlan(id, { planId, reason: planReason || undefined }),
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
       toast.success("Plano atualizado.");
       setPlanReason("");
+      setPlanId(updated.plan.id ?? "");
+      queryClient.setQueryData(["tenant-management", "tenant", id], updated);
       await queryClient.invalidateQueries({ queryKey: ["tenant-management"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel alterar o plano.")
@@ -71,6 +127,15 @@ export function SuperAdminTenantDetail() {
       toast.success("Novo link de convite copiado.");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel gerar o convite.")
+  });
+  const updateMutation = useMutation({
+    mutationFn: (payload: TenantUpdatePayload) => tenantManagementService.updateTenant(id, payload),
+    onSuccess: async (updated) => {
+      toast.success("Tenant atualizado.");
+      queryClient.setQueryData(["tenant-management", "tenant", id], updated);
+      await queryClient.invalidateQueries({ queryKey: ["tenant-management"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel atualizar o tenant.")
   });
 
   const handleStatusSubmit = async (event: FormEvent) => {
@@ -85,6 +150,35 @@ export function SuperAdminTenantDetail() {
       return;
     }
     await planMutation.mutateAsync();
+  };
+
+  const handleEditSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+
+    await updateMutation.mutateAsync({
+      name: editForm.name,
+      legalName: clean(editForm.legalName) || null,
+      document: clean(editForm.document) || null,
+      email: clean(editForm.email) || null,
+      phone: clean(editForm.phone) || null,
+      settings: {
+        brandName: clean(editForm.settings?.brandName) || editForm.name,
+        legalName: clean(editForm.legalName) || null,
+        description: clean(editForm.settings?.description) || null,
+        slogan: clean(editForm.settings?.slogan) || null,
+        businessType: clean(editForm.settings?.businessType) || null,
+        cuisineCategory: clean(editForm.settings?.cuisineCategory) || null,
+        websiteUrl: clean(editForm.settings?.websiteUrl) || null,
+        instagramUrl: clean(editForm.settings?.instagramUrl) || null,
+        whatsapp: clean(editForm.settings?.whatsapp) || null,
+        logoUrl: clean(editForm.settings?.logoUrl) || null,
+        coverImageUrl: clean(editForm.settings?.coverImageUrl) || null,
+        primaryColor: editForm.settings?.primaryColor || "#1a6b3b",
+        secondaryColor: editForm.settings?.secondaryColor || "#27ae51",
+        themeFontFamily: clean(editForm.settings?.themeFontFamily) || "Inter",
+        welcomeMessage: clean(editForm.settings?.welcomeMessage) || null
+      }
+    });
   };
 
   if (isLoading || !tenant) {
@@ -105,9 +199,20 @@ export function SuperAdminTenantDetail() {
         title={tenant.name}
         description={`${tenant.slug} - criado em ${new Date(tenant.createdAt).toLocaleDateString("pt-BR")}`}
         actions={
-          <Link className="ghost-icon-button" to="/superadmin/tenants">
-            <ArrowLeft size={17} /> Voltar
-          </Link>
+          <div className="header-actions">
+            {isEditing ? (
+              <Link className="ghost-icon-button" to={`/superadmin/tenants/${tenant.id}`}>
+                <Eye size={17} /> Visualizar
+              </Link>
+            ) : (
+              <Link className="ghost-icon-button" to={`/superadmin/tenants/${tenant.id}/editar`}>
+                <Edit3 size={17} /> Editar
+              </Link>
+            )}
+            <Link className="ghost-icon-button" to="/superadmin/tenants">
+              <ArrowLeft size={17} /> Voltar
+            </Link>
+          </div>
         }
       />
 
@@ -139,6 +244,181 @@ export function SuperAdminTenantDetail() {
           </div>
         </article>
       </div>
+
+      {isEditing ? (
+        <form className="tms-detail-grid tms-edit-page" onSubmit={handleEditSubmit}>
+          <article className="panel">
+            <div className="tms-panel-title">
+              <h2>Dados da empresa</h2>
+              <Edit3 size={18} aria-hidden="true" />
+            </div>
+            <div className="form-grid two-columns">
+              <label className="field">
+                <span>Nome comercial</span>
+                <div>
+                  <input onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))} value={editForm.name ?? ""} />
+                </div>
+              </label>
+              <label className="field">
+                <span>Nome de exibicao</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, brandName: event.target.value } }))}
+                    value={editForm.settings?.brandName ?? ""}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Razao social</span>
+                <div>
+                  <input onChange={(event) => setEditForm((current) => ({ ...current, legalName: event.target.value }))} value={editForm.legalName ?? ""} />
+                </div>
+              </label>
+              <label className="field">
+                <span>CNPJ</span>
+                <div>
+                  <input onChange={(event) => setEditForm((current) => ({ ...current, document: event.target.value }))} value={editForm.document ?? ""} />
+                </div>
+              </label>
+              <label className="field">
+                <span>Email publico</span>
+                <div>
+                  <input onChange={(event) => setEditForm((current) => ({ ...current, email: event.target.value }))} type="email" value={editForm.email ?? ""} />
+                </div>
+              </label>
+              <label className="field">
+                <span>Telefone</span>
+                <div>
+                  <input onChange={(event) => setEditForm((current) => ({ ...current, phone: event.target.value }))} value={editForm.phone ?? ""} />
+                </div>
+              </label>
+            </div>
+          </article>
+
+          <article className="panel">
+            <div className="tms-panel-title">
+              <h2>Identidade publica</h2>
+              <Store size={18} aria-hidden="true" />
+            </div>
+            <div className="form-grid two-columns">
+              <label className="field">
+                <span>Tipo de negocio</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, businessType: event.target.value } }))}
+                    value={editForm.settings?.businessType ?? ""}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Categoria culinaria</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, cuisineCategory: event.target.value } }))}
+                    value={editForm.settings?.cuisineCategory ?? ""}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>WhatsApp publico</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, whatsapp: event.target.value } }))}
+                    value={editForm.settings?.whatsapp ?? ""}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Instagram</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, instagramUrl: event.target.value } }))}
+                    value={editForm.settings?.instagramUrl ?? ""}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Website</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, websiteUrl: event.target.value } }))}
+                    type="url"
+                    value={editForm.settings?.websiteUrl ?? ""}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Logo URL</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, logoUrl: event.target.value } }))}
+                    type="url"
+                    value={editForm.settings?.logoUrl ?? ""}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Imagem de capa URL</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, coverImageUrl: event.target.value } }))}
+                    type="url"
+                    value={editForm.settings?.coverImageUrl ?? ""}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Fonte do tema</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, themeFontFamily: event.target.value } }))}
+                    value={editForm.settings?.themeFontFamily ?? ""}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Cor primaria</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, primaryColor: event.target.value } }))}
+                    type="color"
+                    value={editForm.settings?.primaryColor ?? "#1a6b3b"}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Cor secundaria</span>
+                <div>
+                  <input
+                    onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, secondaryColor: event.target.value } }))}
+                    type="color"
+                    value={editForm.settings?.secondaryColor ?? "#27ae51"}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Descricao</span>
+                <textarea
+                  onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, description: event.target.value } }))}
+                  value={editForm.settings?.description ?? ""}
+                />
+              </label>
+              <label className="field">
+                <span>Mensagem de boas-vindas</span>
+                <textarea
+                  onChange={(event) => setEditForm((current) => ({ ...current, settings: { ...current.settings, welcomeMessage: event.target.value } }))}
+                  value={editForm.settings?.welcomeMessage ?? ""}
+                />
+              </label>
+            </div>
+          </article>
+
+          <button className="primary-button tms-edit-submit" disabled={updateMutation.isPending} type="submit">
+            {updateMutation.isPending ? <Loader2 className="spin" size={18} /> : <Save size={18} />}
+            Salvar alteracoes
+          </button>
+        </form>
+      ) : null}
 
       <div className="tms-detail-grid">
         <article className="panel">

@@ -12,6 +12,10 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default("8h"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+  PUBLIC_BACKEND_URL: z.string().url().default("http://localhost:3333"),
+  WAHA_BASE_URL: z.string().url().default("http://localhost:3000"),
+  WAHA_API_KEY: z.string().optional(),
+  WAHA_WEBHOOK_SECRET: z.string().optional(),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().default(120)
 });

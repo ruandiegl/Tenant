@@ -27,12 +27,33 @@ services:
     environment:
       DATABASE_URL: postgresql://podepedir:Conquistas%4007@postgres:5432/podepedir?schema=public
       PORT: 3333
+      PUBLIC_BACKEND_URL: http://backend:3333
+      WAHA_BASE_URL: http://waha:3000
+      WAHA_API_KEY: dev-waha-key
+      WAHA_WEBHOOK_SECRET: dev-waha-webhook-secret
     ports:
       - "3333:3333"
     depends_on:
       postgres:
         condition: service_healthy
+      waha:
+        condition: service_started
     command: sh -c "npx prisma migrate deploy && node dist/src/server.js"
+
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: podepedir-waha
+    restart: unless-stopped
+    environment:
+      WAHA_API_KEY: dev-waha-key
+      WAHA_DASHBOARD_USERNAME: admin
+      WAHA_DASHBOARD_PASSWORD: admin
+      WHATSAPP_DEFAULT_ENGINE: WEBJS
+    ports:
+      - "3000:3000"
+    volumes:
+      - waha_sessions:/app/.sessions
 
 volumes:
   postgres_data:
+  waha_sessions:

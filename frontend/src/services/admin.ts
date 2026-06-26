@@ -1,5 +1,6 @@
-import { Branch, Coupon, ReportSummary } from "../types/database";
+import { Branch, Coupon, DeliveryZone, ReportSummary } from "../types/database";
 import { protectedApi } from "./api";
+import { deliveryZonesService } from "./delivery-zones";
 
 type BackendSummary = {
   ordersByStatus: Array<{ status: string; _count: { _all: number }; _sum: { total: string | number | null } }>;
@@ -84,13 +85,15 @@ export const adminService = {
     };
   },
   getTenantAdminBundle: async () => {
-    const [branches, coupons] = await Promise.all([
+    const [branches, coupons, deliveryZones] = await Promise.all([
       protectedApi<Branch[]>("/tenant/branches"),
-      protectedApi<Coupon[]>("/tenant/coupons")
+      protectedApi<Coupon[]>("/tenant/coupons"),
+      deliveryZonesService.list()
     ]);
 
     return {
       branches,
+      deliveryZones: deliveryZones as DeliveryZone[],
       coupons: coupons.map((coupon) => {
         const status = coupon.status as Coupon["status"] | "ARCHIVED";
 

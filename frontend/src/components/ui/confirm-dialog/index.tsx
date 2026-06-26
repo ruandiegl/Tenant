@@ -1,4 +1,4 @@
-import { AlertTriangle, Loader2, LogOut, X } from "lucide-react";
+import { Loader2, LogOut, Trash2, X } from "lucide-react";
 import "./styles.css";
 
 type ConfirmDialogProps = {
@@ -25,7 +25,7 @@ export function ConfirmDialog({
   onConfirm
 }: ConfirmDialogProps) {
   if (!open) return null;
-  const Icon = tone === "neutral" ? LogOut : AlertTriangle;
+  const Icon = tone === "neutral" ? LogOut : Trash2;
 
   return (
     <div className="modal-backdrop confirm-dialog-backdrop" role="presentation" onMouseDown={isLoading ? undefined : onCancel}>
@@ -38,19 +38,18 @@ export function ConfirmDialog({
       >
         <header className="confirm-dialog-header">
           <span className={`confirm-dialog-mark confirm-dialog-mark-${tone}`} aria-hidden="true">
-            <Icon size={20} />
+            <Icon size={18} />
           </span>
-          <div>
-            <h2 id="confirm-dialog-title">{title}</h2>
-            <p>{description}</p>
-          </div>
-          <button aria-label="Fechar confirmacao" className="ghost-icon-button" disabled={isLoading} onClick={onCancel} type="button">
+          <button className="confirm-dialog-close" disabled={isLoading} onClick={onCancel} type="button" aria-label="Fechar">
             <X size={18} />
           </button>
+          <h2 id="confirm-dialog-title">{title}</h2>
         </header>
 
+        <p className="confirm-dialog-description">{description}</p>
+
         <div className="confirm-dialog-actions">
-          <button className="ghost-icon-button" disabled={isLoading} onClick={onCancel} type="button">
+          <button className="confirm-cancel-button" disabled={isLoading} onClick={onCancel} type="button">
             {cancelLabel}
           </button>
           <button className={`confirm-action-button confirm-action-${tone}`} disabled={isLoading} onClick={onConfirm} type="button">

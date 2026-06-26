@@ -1,0 +1,142 @@
+.deliveries-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.delivery-zone-form {
+  display: grid;
+  gap: 14px;
+}
+
+.delivery-heading {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.delivery-heading h2 {
+  margin: 0 0 4px;
+}
+
+.delivery-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.delivery-map-card {
+  background: #edf6f1;
+  border-color: #c8ddd1;
+}
+
+.delivery-map-card strong {
+  color: var(--brand-dark);
+  display: block;
+  font-size: 1.05rem;
+  margin: 4px 0;
+}
+
+.delivery-map-card p {
+  color: var(--muted);
+  font-weight: 750;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.delivery-map-preview {
+  align-items: center;
+  background:
+    linear-gradient(90deg, rgba(30, 107, 60, 0.12) 1px, transparent 1px),
+    linear-gradient(rgba(30, 107, 60, 0.12) 1px, transparent 1px),
+    #f8fbf8;
+  background-size: 22px 22px;
+  border: 1px solid #d7e6dd;
+  border-radius: 8px;
+  color: var(--brand-dark);
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  min-height: 150px;
+  padding: 20px;
+  text-align: center;
+}
+
+.delivery-map-preview span {
+  font-weight: 850;
+}
+
+.delivery-zone-list-panel {
+  grid-column: 1 / -1;
+}
+
+.delivery-zone-list {
+  display: grid;
+  gap: 8px;
+}
+
+.delivery-zone-card {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1.2fr) auto auto auto auto;
+  padding: 12px;
+}
+
+.delivery-zone-card div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.delivery-zone-card strong,
+.delivery-zone-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-zone-card span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.delivery-zone-card button {
+  background: var(--surface-strong);
+  border: 0;
+  border-radius: 8px;
+  color: var(--brand-dark);
+  font-weight: 850;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.delivery-zone-card .danger-link-button {
+  align-items: center;
+  color: var(--danger);
+  display: inline-flex;
+  justify-content: center;
+  padding: 0;
+  width: 38px;
+}
+
+@media (min-width: 860px) {
+  .deliveries-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .delivery-zone-card {
+    grid-template-columns: 1fr auto;
+  }
+
+  .delivery-zone-card .status-badge,
+  .delivery-zone-card button {
+    justify-self: start;
+  }
+}

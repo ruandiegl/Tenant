@@ -5,6 +5,7 @@ declare global {
     interface Request {
       auth?: RequestAuth;
       tenantId?: string;
+      rawBody?: Buffer;
     }
   }
 }

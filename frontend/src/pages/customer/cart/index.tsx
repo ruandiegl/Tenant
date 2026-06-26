@@ -1,17 +1,36 @@
 import "./styles.css";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bike, ChevronLeft, CreditCard, MapPin, Minus, Phone, Plus, ReceiptText, Trash2, UserRound, WalletCards } from "lucide-react";
+import { Bike, ChevronLeft, CreditCard, MapPin, Minus, Phone, Plus, ReceiptText, ShoppingBag, Store, Trash2, UserRound, WalletCards } from "lucide-react";
 import { toast } from "react-toastify";
 import { useCustomerFlow } from "../../../app/providers/customer-flow-provider";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
+import { deliveryZonesService } from "../../../services/delivery-zones";
+import { DeliveryZone } from "../../../types/database";
 import { formatCurrency } from "../../../utils/format";
 import { formatCep, formatPhone, onlyDigits } from "../../../utils/input-masks";
 import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../../../utils/public-tenant-route";
 
 type CheckoutStep = "cart" | "address" | "payment" | "done";
+
+function findDeliveryZone(zones: DeliveryZone[], postalCode: string, subtotal: number) {
+  const cep = Number(onlyDigits(postalCode));
+
+  return zones.find((zone) => {
+    if (zone.status !== "ACTIVE" || subtotal < zone.minimumOrderValue) return false;
+
+    if (zone.type === "POSTAL_CODE") {
+      const start = Number(onlyDigits(zone.postalCodeStart ?? ""));
+      const end = Number(onlyDigits(zone.postalCodeEnd ?? ""));
+      return Boolean(cep && start && end && cep >= start && cep <= end);
+    }
+
+    return true;
+  });
+}
 
 export function CustomerCart({ step }: { step: CheckoutStep }) {
   const navigate = useNavigate();
@@ -21,6 +40,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
   const {
     items,
     address,
+    fulfillment,
     payment,
     profile,
     order,
@@ -32,6 +52,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
     decrementItem,
     removeItem,
     updateItemNotes,
+    updateFulfillment,
     updateAddress,
     updatePayment,
     updateProfile,
@@ -44,6 +65,11 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
   const [cepLookupError, setCepLookupError] = useState<string | null>(null);
   const lastCepLookupRef = useRef("");
   const [cartItemPendingDelete, setCartItemPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const { data: deliveryZones = [] } = useQuery({
+    queryKey: ["public-delivery-zones", tenantSlug],
+    queryFn: () => deliveryZonesService.listPublic(tenantSlug),
+    staleTime: 60_000
+  });
 
   const missingAddress = useMemo(
     () => !address.street || !address.number || !address.district || !address.postalCode,
@@ -51,6 +77,10 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
   );
 
   const paymentLabel = payment.type === "PIX" ? "PIX" : payment.type === "CREDIT_CARD" ? "Cartao de credito" : "Dinheiro";
+  const selectedZone = useMemo(
+    () => findDeliveryZone(deliveryZones, address.postalCode, subtotal),
+    [address.postalCode, deliveryZones, subtotal]
+  );
   const pageTitle =
     step === "cart" ? "Revise seu pedido" : step === "address" ? "Endereco de entrega" : step === "payment" ? "Pagamento" : "Pedido confirmado";
   const pageDescription =
@@ -114,6 +144,35 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
     return () => controller.abort();
   }, [address.postalCode, updateAddress]);
 
+  useEffect(() => {
+    if (fulfillment.type === "PICKUP") {
+      if (fulfillment.deliveryFee !== 0) {
+        updateFulfillment({ deliveryFee: 0, zoneId: undefined, zoneName: undefined, estimatedMinutes: undefined });
+      }
+      return;
+    }
+
+    if (selectedZone) {
+      if (
+        fulfillment.zoneId !== selectedZone.id ||
+        fulfillment.deliveryFee !== selectedZone.fee ||
+        fulfillment.estimatedMinutes !== selectedZone.estimatedMinutes
+      ) {
+        updateFulfillment({
+          deliveryFee: selectedZone.fee,
+          zoneId: selectedZone.id,
+          zoneName: selectedZone.name,
+          estimatedMinutes: selectedZone.estimatedMinutes
+        });
+      }
+      return;
+    }
+
+    if (onlyDigits(address.postalCode).length >= 8 && (fulfillment.deliveryFee !== 0 || fulfillment.zoneId)) {
+      updateFulfillment({ deliveryFee: 0, zoneId: undefined, zoneName: undefined, estimatedMinutes: undefined });
+    }
+  }, [address.postalCode, fulfillment.deliveryFee, fulfillment.estimatedMinutes, fulfillment.type, fulfillment.zoneId, selectedZone, updateFulfillment]);
+
   const nextStep = () => {
     setError(null);
 
@@ -135,9 +194,15 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
         return;
       }
 
-      if (missingAddress) {
+      if (fulfillment.type === "DELIVERY" && missingAddress) {
         setError("Preencha rua, numero, bairro e CEP para continuar.");
         toast.warning("Preencha rua, numero, bairro e CEP para continuar.");
+        return;
+      }
+
+      if (fulfillment.type === "DELIVERY" && onlyDigits(address.postalCode).length >= 8 && deliveryZones.length > 0 && !selectedZone) {
+        setError("Este CEP ainda nao esta dentro de uma area de entrega ativa.");
+        toast.warning("Este CEP ainda nao esta dentro de uma area de entrega ativa.");
         return;
       }
 
@@ -163,9 +228,16 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       return;
     }
 
-    if (missingAddress) {
+    if (fulfillment.type === "DELIVERY" && missingAddress) {
       setError("Preencha rua, numero, bairro e CEP para salvar o pedido.");
       toast.warning("Preencha rua, numero, bairro e CEP para salvar o pedido.");
+      navigate(tenantPath("/carrinho/endereco"));
+      return;
+    }
+
+    if (fulfillment.type === "DELIVERY" && onlyDigits(address.postalCode).length >= 8 && deliveryZones.length > 0 && !selectedZone) {
+      setError("Este CEP ainda nao esta dentro de uma area de entrega ativa.");
+      toast.warning("Este CEP ainda nao esta dentro de uma area de entrega ativa.");
       navigate(tenantPath("/carrinho/endereco"));
       return;
     }
@@ -254,36 +326,59 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                 </Link>
               </div>
             ) : (
-              items.map((item) => (
-                <div className="cart-item-card" key={item.id}>
-                  <img src={item.imageUrl} alt={item.productName} />
-                  <div>
-                    <strong>{item.productName}</strong>
-                    <span>{formatCurrency(item.unitPrice)}</span>
-                    {item.options.length > 0 ? (
-                      <small className="muted-text">{item.options.map((option) => option.optionName).join(", ")}</small>
-                    ) : null}
-                    <textarea
-                      aria-label={`Observacoes para ${item.productName}`}
-                      onChange={(event) => updateItemNotes(item.id, event.target.value)}
-                      placeholder="Observacoes do item"
-                      value={item.notes}
-                    />
-                  </div>
-                  <div className="quantity-control">
-                    <button aria-label="Diminuir item" onClick={() => decrementItem(item.id)}>
-                      <Minus size={16} />
-                    </button>
-                    <strong>{item.quantity}</strong>
-                    <button aria-label="Aumentar item" onClick={() => incrementItem(item.id)}>
-                      <Plus size={16} />
-                    </button>
-                    <button aria-label="Remover item" onClick={() => setCartItemPendingDelete({ id: item.id, name: item.productName })}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+              <>
+                <div className="fulfillment-switch" role="group" aria-label="Forma de recebimento">
+                  <button
+                    className={fulfillment.type === "DELIVERY" ? "selected" : ""}
+                    onClick={() => updateFulfillment({ type: "DELIVERY", deliveryFee: selectedZone?.fee ?? (fulfillment.deliveryFee || 8) })}
+                    type="button"
+                  >
+                    <Bike size={18} />
+                    <span>Entrega</span>
+                    <small>Receber no endereco</small>
+                  </button>
+                  <button
+                    className={fulfillment.type === "PICKUP" ? "selected" : ""}
+                    onClick={() => updateFulfillment({ type: "PICKUP", deliveryFee: 0, zoneId: undefined, zoneName: undefined })}
+                    type="button"
+                  >
+                    <Store size={18} />
+                    <span>Retirada</span>
+                    <small>Buscar na loja</small>
+                  </button>
                 </div>
-              ))
+
+                {items.map((item) => (
+                  <div className="cart-item-card" key={item.id}>
+                    <img src={item.imageUrl} alt={item.productName} />
+                    <div>
+                      <strong>{item.productName}</strong>
+                      <span>{formatCurrency(item.unitPrice)}</span>
+                      {item.options.length > 0 ? (
+                        <small className="muted-text">{item.options.map((option) => option.optionName).join(", ")}</small>
+                      ) : null}
+                      <textarea
+                        aria-label={`Observacoes para ${item.productName}`}
+                        onChange={(event) => updateItemNotes(item.id, event.target.value)}
+                        placeholder="Observacoes do item"
+                        value={item.notes}
+                      />
+                    </div>
+                    <div className="quantity-control">
+                      <button aria-label="Diminuir item" onClick={() => decrementItem(item.id)}>
+                        <Minus size={16} />
+                      </button>
+                      <strong>{item.quantity}</strong>
+                      <button aria-label="Aumentar item" onClick={() => incrementItem(item.id)}>
+                        <Plus size={16} />
+                      </button>
+                      <button aria-label="Remover item" onClick={() => setCartItemPendingDelete({ id: item.id, name: item.productName })}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
             )}
           </article>
 
@@ -305,7 +400,25 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       {step === "address" && items.length > 0 ? (
         <div className="checkout-grid">
           <article className="panel">
-            <h2>Dados para entrega</h2>
+            <h2>{fulfillment.type === "DELIVERY" ? "Dados para entrega" : "Dados para retirada"}</h2>
+            <div className="fulfillment-switch compact" role="group" aria-label="Forma de recebimento">
+              <button
+                className={fulfillment.type === "DELIVERY" ? "selected" : ""}
+                onClick={() => updateFulfillment({ type: "DELIVERY", deliveryFee: selectedZone?.fee ?? 8 })}
+                type="button"
+              >
+                <Bike size={18} />
+                Entrega
+              </button>
+              <button
+                className={fulfillment.type === "PICKUP" ? "selected" : ""}
+                onClick={() => updateFulfillment({ type: "PICKUP", deliveryFee: 0, zoneId: undefined, zoneName: undefined })}
+                type="button"
+              >
+                <Store size={18} />
+                Retirada
+              </button>
+            </div>
             <div className="form-grid two-columns">
               <label className="field">
                 <span>Nome para contato</span>
@@ -327,64 +440,77 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                   />
                 </div>
               </label>
-              <label className="field">
-                <span>CEP</span>
-                <div>
-                  <MapPin size={18} />
-                  <input
-                    autoComplete="postal-code"
-                    inputMode="numeric"
-                    value={address.postalCode}
-                    onChange={(event) => updateAddress({ postalCode: formatCep(event.target.value) })}
-                    placeholder="00000-000"
-                  />
+              {fulfillment.type === "DELIVERY" ? (
+                <>
+                  <label className="field">
+                    <span>CEP</span>
+                    <div>
+                      <MapPin size={18} />
+                      <input
+                        autoComplete="postal-code"
+                        inputMode="numeric"
+                        value={address.postalCode}
+                        onChange={(event) => updateAddress({ postalCode: formatCep(event.target.value) })}
+                        placeholder="00000-000"
+                      />
+                    </div>
+                    {isLookingUpCep ? <small className="field-hint">Buscando endereco...</small> : null}
+                    {cepLookupError ? <small className="field-hint field-hint-error">{cepLookupError}</small> : null}
+                    {selectedZone ? <small className="field-hint">Area {selectedZone.name}: {formatCurrency(selectedZone.fee)}</small> : null}
+                  </label>
+                  <label className="field">
+                    <span>Rua</span>
+                    <div>
+                      <Bike size={18} />
+                      <input value={address.street} onChange={(event) => updateAddress({ street: event.target.value })} placeholder="Rua" />
+                    </div>
+                  </label>
+                  <label className="field">
+                    <span>Numero</span>
+                    <div>
+                      <Bike size={18} />
+                      <input value={address.number} onChange={(event) => updateAddress({ number: event.target.value })} placeholder="123" />
+                    </div>
+                  </label>
+                  <label className="field">
+                    <span>Complemento</span>
+                    <div>
+                      <Bike size={18} />
+                      <input
+                        value={address.complement}
+                        onChange={(event) => updateAddress({ complement: event.target.value })}
+                        placeholder="Apto, bloco"
+                      />
+                    </div>
+                  </label>
+                  <label className="field">
+                    <span>Bairro</span>
+                    <div>
+                      <Bike size={18} />
+                      <input value={address.district} onChange={(event) => updateAddress({ district: event.target.value })} placeholder="Bairro" />
+                    </div>
+                  </label>
+                  <label className="field">
+                    <span>Referencia</span>
+                    <div>
+                      <Bike size={18} />
+                      <input
+                        value={address.reference}
+                        onChange={(event) => updateAddress({ reference: event.target.value })}
+                        placeholder="Ponto de referencia"
+                      />
+                    </div>
+                  </label>
+                </>
+              ) : (
+                <div className="pickup-summary">
+                  <ShoppingBag size={20} />
+                  <div>
+                    <strong>Retirada na loja selecionada</strong>
+                    <span>Voce nao precisa cadastrar endereco. Avisaremos quando o pedido estiver pronto.</span>
+                  </div>
                 </div>
-                {isLookingUpCep ? <small className="field-hint">Buscando endereco...</small> : null}
-                {cepLookupError ? <small className="field-hint field-hint-error">{cepLookupError}</small> : null}
-              </label>
-              <label className="field">
-                <span>Rua</span>
-                <div>
-                  <Bike size={18} />
-                  <input value={address.street} onChange={(event) => updateAddress({ street: event.target.value })} placeholder="Rua" />
-                </div>
-              </label>
-              <label className="field">
-                <span>Numero</span>
-                <div>
-                  <Bike size={18} />
-                  <input value={address.number} onChange={(event) => updateAddress({ number: event.target.value })} placeholder="123" />
-                </div>
-              </label>
-              <label className="field">
-                <span>Complemento</span>
-                <div>
-                  <Bike size={18} />
-                  <input
-                    value={address.complement}
-                    onChange={(event) => updateAddress({ complement: event.target.value })}
-                    placeholder="Apto, bloco"
-                  />
-                </div>
-              </label>
-              <label className="field">
-                <span>Bairro</span>
-                <div>
-                  <Bike size={18} />
-                  <input value={address.district} onChange={(event) => updateAddress({ district: event.target.value })} placeholder="Bairro" />
-                </div>
-              </label>
-              <label className="field">
-                <span>Referencia</span>
-                <div>
-                  <Bike size={18} />
-                  <input
-                    value={address.reference}
-                    onChange={(event) => updateAddress({ reference: event.target.value })}
-                    placeholder="Ponto de referencia"
-                  />
-                </div>
-              </label>
+              )}
             </div>
           </article>
 
@@ -512,9 +638,9 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
           </article>
 
           <article className="panel">
-            <h2>Entrega</h2>
+            <h2>{fulfillment.type === "DELIVERY" ? "Entrega" : "Retirada"}</h2>
             <p className="muted-text">
-              {address.street}, {address.number} - {address.district}
+              {fulfillment.type === "DELIVERY" ? `${address.street}, ${address.number} - ${address.district}` : "Pedido marcado para retirada na loja."}
             </p>
             <Link className="wide-link" to={tenantPath("/perfil")}>
               Salvar dados no perfil

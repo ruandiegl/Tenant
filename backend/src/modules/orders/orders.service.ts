@@ -2,6 +2,7 @@ import { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { getSocketServer } from "../../config/socket.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { notifyOrderStatusChanged } from "../whatsapp/whatsapp.service.js";
 
 const publicCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 
@@ -96,6 +97,18 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
 
   if (!branch) {
     throw new AppError("Branch not found or unavailable", 404);
+  }
+
+  if (data.type === "DELIVERY" && !branch.acceptsDelivery) {
+    throw new AppError("Branch does not accept delivery orders", 400);
+  }
+
+  if (data.type === "PICKUP" && !branch.acceptsPickup) {
+    throw new AppError("Branch does not accept pickup orders", 400);
+  }
+
+  if (data.type === "DELIVERY" && !data.deliveryAddress) {
+    throw new AppError("Delivery address is required for delivery orders", 400);
   }
 
   const products = await prisma.product.findMany({
@@ -318,6 +331,7 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
   });
 
   emitOrderEvent("order.created", order);
+  void notifyOrderStatusChanged(tenant.id, order.id).catch(() => undefined);
   return order;
 };
 
@@ -418,5 +432,6 @@ export const updateOrderStatus = async (
   });
 
   emitOrderEvent(status === "CANCELLED" ? "order.cancelled" : "order.status_changed", updated);
+  void notifyOrderStatusChanged(tenantId, updated.id).catch(() => undefined);
   return updated;
 };

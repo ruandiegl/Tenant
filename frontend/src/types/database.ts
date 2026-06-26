@@ -24,6 +24,7 @@ export type PaymentStatus =
   | "CANCELLED";
 export type PaymentType = "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "PIX" | "VOUCHER" | "ONLINE";
 export type DiscountType = "PERCENTAGE" | "FIXED_AMOUNT" | "FREE_DELIVERY";
+export type WhatsappSessionStatus = "PENDING_QR" | "CONNECTED" | "DISCONNECTED" | "ERROR";
 
 export type BaseEntity = {
   id: string;
@@ -69,6 +70,22 @@ export type TenantSettings = {
   minimumOrderValue: number;
 };
 
+export type WhatsappSession = BaseEntity & {
+  tenantId: string;
+  sessionName: string;
+  phoneNumber?: string | null;
+  displayName?: string | null;
+  status: WhatsappSessionStatus;
+  qrCode?: string | null;
+  autoReplyEnabled: boolean;
+  notifyOrderStatus: boolean;
+  welcomeMessage?: string | null;
+  lastStatusAt?: string | null;
+  connectedAt?: string | null;
+  disconnectedAt?: string | null;
+  lastError?: string | null;
+};
+
 export type Branch = BaseEntity & {
   tenantId: string;
   name: string;
@@ -80,6 +97,22 @@ export type Branch = BaseEntity & {
   acceptsDelivery: boolean;
   acceptsPickup: boolean;
   acceptsDineIn: boolean;
+  address?: Address;
+};
+
+export type DeliveryZone = BaseEntity & {
+  tenantId: string;
+  branchId: string;
+  name: string;
+  type: "POSTAL_CODE" | "RADIUS";
+  postalCodeStart?: string;
+  postalCodeEnd?: string;
+  radiusKm?: number;
+  fee: number;
+  minimumOrderValue: number;
+  estimatedMinutes?: number;
+  status: "ACTIVE" | "INACTIVE";
+  branch?: Branch;
 };
 
 export type Address = BaseEntity & {
