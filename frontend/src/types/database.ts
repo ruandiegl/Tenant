@@ -25,6 +25,17 @@ export type PaymentStatus =
 export type PaymentType = "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "PIX" | "VOUCHER" | "ONLINE";
 export type DiscountType = "PERCENTAGE" | "FIXED_AMOUNT" | "FREE_DELIVERY";
 export type WhatsappSessionStatus = "PENDING_QR" | "CONNECTED" | "DISCONNECTED" | "ERROR";
+export type WhatsappTemplateTrigger =
+  | "WELCOME"
+  | "ORDER_PLACED"
+  | "ORDER_ACCEPTED"
+  | "ORDER_PREPARING"
+  | "ORDER_READY"
+  | "ORDER_DISPATCHED"
+  | "ORDER_DELIVERED"
+  | "ORDER_COMPLETED"
+  | "ORDER_CANCELLED"
+  | "ORDER_REJECTED";
 
 export type BaseEntity = {
   id: string;
@@ -84,6 +95,16 @@ export type WhatsappSession = BaseEntity & {
   connectedAt?: string | null;
   disconnectedAt?: string | null;
   lastError?: string | null;
+};
+
+export type WhatsappMessageTemplate = BaseEntity & {
+  tenantId: string;
+  sessionId: string;
+  trigger: WhatsappTemplateTrigger;
+  title: string;
+  body: string;
+  enabled: boolean;
+  sortOrder: number;
 };
 
 export type Branch = BaseEntity & {

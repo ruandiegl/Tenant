@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { resolveTenantSlugAlias } from "../../shared/tenant-slug-aliases.js";
 
 export const createTenant = async (data: {
   name: string;
@@ -97,7 +98,7 @@ export const updateTenant = async (id: string, data: Partial<Parameters<typeof c
 
 export const getPublicTenant = async (slug: string) => {
   const tenant = await prisma.tenant.findUnique({
-    where: { slug },
+    where: { slug: resolveTenantSlugAlias(slug) },
     include: { settings: true, branches: { where: { status: "ACTIVE" } } }
   });
 

@@ -14,3 +14,20 @@ export const whatsappTestMessageSchema = z.object({
     message: z.string().min(1).max(1200)
   })
 });
+
+export const whatsappTemplateUpdateSchema = z.object({
+  params: z.object({
+    id: z.string().min(1)
+  }),
+  body: z.object({
+    title: z.string().min(2).max(80).optional(),
+    body: z.string().min(1).max(1600).optional(),
+    enabled: z.boolean().optional()
+  })
+});
+
+export const whatsappTemplateDeleteSchema = z.object({
+  params: z.object({
+    id: z.string().min(1)
+  })
+});

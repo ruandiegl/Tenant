@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
-import { env } from "./env.js";
+import { corsOrigin } from "./cors.js";
 import { verifyAccessToken } from "./jwt.js";
 
 let io: Server | undefined;
@@ -8,7 +8,7 @@ let io: Server | undefined;
 export const configureSocket = (server: HttpServer) => {
   io = new Server(server, {
     cors: {
-      origin: env.CORS_ORIGIN,
+      origin: corsOrigin,
       credentials: true
     }
   });

@@ -30,6 +30,20 @@
   width: 82px;
 }
 
+.settings-menu-url {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.settings-menu-url strong {
+  color: var(--muted);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
 .settings-preview-panel {
   grid-template-columns: 132px minmax(0, 1fr);
 }

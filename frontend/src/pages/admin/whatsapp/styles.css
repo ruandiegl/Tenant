@@ -98,6 +98,10 @@
   gap: 10px;
 }
 
+.whatsapp-templates-panel {
+  grid-column: 1 / -1;
+}
+
 .toggle-row {
   align-items: center;
   background: var(--surface-strong);
@@ -137,9 +141,119 @@
   font-weight: 700;
 }
 
+.template-token-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.template-token-row code {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--brand-dark);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 7px 9px;
+}
+
+.template-list {
+  display: grid;
+  gap: 10px;
+}
+
+.template-editor {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.template-editor.disabled {
+  background: #f8faf8;
+  opacity: 0.78;
+}
+
+.template-editor-head {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+}
+
+.template-editor-head div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.template-editor-head span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.template-editor-head input,
+.template-editor textarea {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  outline: 0;
+  width: 100%;
+}
+
+.template-editor-head input {
+  font-weight: 850;
+  min-height: 42px;
+  padding: 0 11px;
+}
+
+.template-editor textarea {
+  line-height: 1.45;
+  min-height: 86px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.template-enabled {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 10px;
+}
+
+.template-enabled input {
+  accent-color: var(--brand);
+  height: 17px;
+  width: 17px;
+}
+
+.template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.danger-action {
+  color: var(--danger);
+}
+
 @media (min-width: 860px) {
   .whatsapp-grid {
     grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1fr);
+  }
+
+  .template-editor-head {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .whatsapp-test {

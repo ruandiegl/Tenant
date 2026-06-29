@@ -94,6 +94,7 @@ export const tenantUpdateSchema = z.object({
   params: z.object({ id: z.string().min(1) }),
   body: z.object({
     name: z.string().min(2).optional(),
+    slug: z.string().min(2).regex(/^[a-z0-9-]+$/).optional(),
     legalName: z.string().nullable().optional(),
     document: z.string().nullable().optional(),
     email: z.string().email().nullable().optional(),

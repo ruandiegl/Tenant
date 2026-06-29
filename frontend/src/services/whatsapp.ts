@@ -1,4 +1,4 @@
-import { WhatsappSession } from "../types/database";
+import { WhatsappMessageTemplate, WhatsappSession } from "../types/database";
 import { protectedApi } from "./api";
 
 export const whatsappService = {
@@ -28,5 +28,15 @@ export const whatsappService = {
     protectedApi<{ sent: boolean }>("/tenant/whatsapp/messages/test", {
       method: "POST",
       body: JSON.stringify(payload)
+    }),
+  listTemplates: () => protectedApi<WhatsappMessageTemplate[]>("/tenant/whatsapp/templates"),
+  updateTemplate: (id: string, payload: { title?: string; body?: string; enabled?: boolean }) =>
+    protectedApi<WhatsappMessageTemplate>(`/tenant/whatsapp/templates/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }),
+  deleteTemplate: (id: string) =>
+    protectedApi<WhatsappMessageTemplate>(`/tenant/whatsapp/templates/${id}`, {
+      method: "DELETE"
     })
 };

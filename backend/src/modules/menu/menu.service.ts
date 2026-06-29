@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { resolveTenantSlugAlias } from "../../shared/tenant-slug-aliases.js";
 
 type CategoryInput = {
   branchId?: string;
@@ -538,7 +539,7 @@ export const deleteProductTemplate = async (tenantId: string, id: string) => {
 };
 
 export const getPublicMenu = async (tenantSlug: string, branchId?: string) => {
-  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, include: { settings: true } });
+  const tenant = await prisma.tenant.findUnique({ where: { slug: resolveTenantSlugAlias(tenantSlug) }, include: { settings: true } });
 
   if (!tenant || tenant.status !== "ACTIVE") {
     throw new AppError("Tenant not found or unavailable", 404);

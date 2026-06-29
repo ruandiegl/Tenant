@@ -1,4 +1,4 @@
-import { OrderStatus, Prisma, WhatsappSessionStatus } from "@prisma/client";
+import { OrderStatus, Prisma, WhatsappSessionStatus, WhatsappTemplateTrigger } from "@prisma/client";
 import crypto from "node:crypto";
 import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
@@ -24,7 +24,84 @@ type SessionWithTenant = Prisma.WhatsappSessionGetPayload<{
   include: { tenant: { include: { settings: true } } };
 }>;
 
+type TemplateUpdateInput = {
+  title?: string;
+  body?: string;
+  enabled?: boolean;
+};
+
+type TemplateVariables = Record<string, string | number | null | undefined>;
+
 const SESSION_PREFIX = "podepedir";
+const AUTO_REPLY_COOLDOWN_MS = 2 * 60_000;
+
+const DEFAULT_TEMPLATES: Array<{
+  trigger: WhatsappTemplateTrigger;
+  title: string;
+  body: string;
+  sortOrder: number;
+}> = [
+  {
+    trigger: "WELCOME",
+    title: "Saudacao automatica",
+    body: "Ola! Voce esta falando com {restaurante}. Para fazer seu pedido, acesse {cardapio}.",
+    sortOrder: 10
+  },
+  {
+    trigger: "ORDER_PLACED",
+    title: "Pedido recebido",
+    body: "{restaurante}: recebemos seu pedido #{codigo}. Acompanhe em {rastreamento}",
+    sortOrder: 20
+  },
+  {
+    trigger: "ORDER_ACCEPTED",
+    title: "Pedido aceito",
+    body: "{restaurante}: seu pedido #{codigo} foi aceito.",
+    sortOrder: 30
+  },
+  {
+    trigger: "ORDER_PREPARING",
+    title: "Em preparo",
+    body: "{restaurante}: seu pedido #{codigo} esta em preparo.",
+    sortOrder: 40
+  },
+  {
+    trigger: "ORDER_READY",
+    title: "Pedido pronto",
+    body: "{restaurante}: seu pedido #{codigo} esta pronto.",
+    sortOrder: 50
+  },
+  {
+    trigger: "ORDER_DISPATCHED",
+    title: "Saiu para entrega",
+    body: "{restaurante}: seu pedido #{codigo} saiu para entrega.",
+    sortOrder: 60
+  },
+  {
+    trigger: "ORDER_DELIVERED",
+    title: "Pedido entregue",
+    body: "{restaurante}: seu pedido #{codigo} foi entregue. Obrigado!",
+    sortOrder: 70
+  },
+  {
+    trigger: "ORDER_COMPLETED",
+    title: "Pedido concluido",
+    body: "{restaurante}: seu pedido #{codigo} foi concluido. Obrigado!",
+    sortOrder: 80
+  },
+  {
+    trigger: "ORDER_CANCELLED",
+    title: "Pedido cancelado",
+    body: "{restaurante}: seu pedido #{codigo} foi cancelado.",
+    sortOrder: 90
+  },
+  {
+    trigger: "ORDER_REJECTED",
+    title: "Pedido recusado",
+    body: "{restaurante}: nao conseguimos aceitar o pedido #{codigo}.",
+    sortOrder: 100
+  }
+];
 
 const sessionNameForTenant = (slug: string) =>
   `${SESSION_PREFIX}-${slug}`
@@ -61,28 +138,6 @@ const publicMenuUrl = (tenantSlug: string) => `${env.FRONTEND_URL.replace(/\/$/,
 const defaultWelcomeMessage = (tenant: { name: string; slug: string; settings: { brandName: string | null; welcomeMessage: string | null } | null }) =>
   tenant.settings?.welcomeMessage ||
   `Ola! Voce esta falando com ${tenant.settings?.brandName ?? tenant.name}. Para fazer seu pedido, acesse ${publicMenuUrl(tenant.slug)}.`;
-
-const orderStatusMessage = (order: {
-  publicCode: string;
-  status: OrderStatus;
-  tenant: { name: string; slug: string; settings: { brandName: string | null } | null };
-}) => {
-  const restaurantName = order.tenant.settings?.brandName ?? order.tenant.name;
-  const trackingUrl = `${env.FRONTEND_URL.replace(/\/$/, "")}/${order.tenant.slug}/pedido/${order.publicCode}`;
-  const messages: Partial<Record<OrderStatus, string>> = {
-    PLACED: `${restaurantName}: recebemos seu pedido #${order.publicCode}. Acompanhe em ${trackingUrl}`,
-    ACCEPTED: `${restaurantName}: seu pedido #${order.publicCode} foi aceito.`,
-    PREPARING: `${restaurantName}: seu pedido #${order.publicCode} esta em preparo.`,
-    READY: `${restaurantName}: seu pedido #${order.publicCode} esta pronto.`,
-    DISPATCHED: `${restaurantName}: seu pedido #${order.publicCode} saiu para entrega.`,
-    DELIVERED: `${restaurantName}: seu pedido #${order.publicCode} foi entregue. Obrigado!`,
-    COMPLETED: `${restaurantName}: seu pedido #${order.publicCode} foi concluido. Obrigado!`,
-    CANCELLED: `${restaurantName}: seu pedido #${order.publicCode} foi cancelado.`,
-    REJECTED: `${restaurantName}: nao conseguimos aceitar o pedido #${order.publicCode}.`
-  };
-
-  return messages[order.status];
-};
 
 const getExternalId = (payload: Record<string, unknown>) => {
   const id = payload.id;
@@ -129,6 +184,64 @@ const getWahaStatus = (error: unknown) =>
     ? Number((error.details as { wahaStatus?: unknown }).wahaStatus)
     : undefined;
 
+const triggerForOrderStatus = (status: OrderStatus): WhatsappTemplateTrigger | null => {
+  const triggers: Partial<Record<OrderStatus, WhatsappTemplateTrigger>> = {
+    PLACED: "ORDER_PLACED",
+    ACCEPTED: "ORDER_ACCEPTED",
+    PREPARING: "ORDER_PREPARING",
+    READY: "ORDER_READY",
+    DISPATCHED: "ORDER_DISPATCHED",
+    DELIVERED: "ORDER_DELIVERED",
+    COMPLETED: "ORDER_COMPLETED",
+    CANCELLED: "ORDER_CANCELLED",
+    REJECTED: "ORDER_REJECTED"
+  };
+
+  return triggers[status] ?? null;
+};
+
+const renderTemplate = (body: string, variables: TemplateVariables) =>
+  body.replace(/\{([a-zA-Z0-9_]+)\}/g, (_match, key: string) => String(variables[key] ?? ""));
+
+const templateVariablesForTenant = (tenant: { name: string; slug: string; settings: { brandName: string | null } | null }) => ({
+  restaurante: tenant.settings?.brandName ?? tenant.name,
+  cardapio: publicMenuUrl(tenant.slug)
+});
+
+const ensureDefaultTemplates = async (tenantId: string, sessionId: string) => {
+  await prisma.$transaction(
+    DEFAULT_TEMPLATES.map((template) =>
+      prisma.whatsappMessageTemplate.upsert({
+        where: { sessionId_trigger: { sessionId, trigger: template.trigger } },
+        create: {
+          tenantId,
+          sessionId,
+          trigger: template.trigger,
+          title: template.title,
+          body: template.body,
+          sortOrder: template.sortOrder
+        },
+        update: {}
+      })
+    )
+  );
+};
+
+const getRenderedTemplate = async (sessionId: string, trigger: WhatsappTemplateTrigger, variables: TemplateVariables) => {
+  const template = await prisma.whatsappMessageTemplate.findUnique({
+    where: { sessionId_trigger: { sessionId, trigger } }
+  });
+
+  if (template && !template.enabled) return "";
+
+  const fallback = DEFAULT_TEMPLATES.find((item) => item.trigger === trigger);
+  const body = template?.body || fallback?.body;
+
+  if (!body) return null;
+
+  return renderTemplate(body, variables).trim();
+};
+
 const syncSessionStatusFromWaha = async (session: NonNullable<Awaited<ReturnType<typeof prisma.whatsappSession.findUnique>>>) => {
   const wahaSession = await wahaRequest<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(session.sessionName)}`);
   const nextStatus = normalizeWahaStatus(asString(wahaSession.status));
@@ -172,6 +285,22 @@ export const mapSession = (session: Awaited<ReturnType<typeof prisma.whatsappSes
       }
     : null;
 
+const mapTemplate = (template: Awaited<ReturnType<typeof prisma.whatsappMessageTemplate.findFirst>>) =>
+  template
+    ? {
+        id: template.id,
+        tenantId: template.tenantId,
+        sessionId: template.sessionId,
+        trigger: template.trigger,
+        title: template.title,
+        body: template.body,
+        enabled: template.enabled,
+        sortOrder: template.sortOrder,
+        createdAt: template.createdAt,
+        updatedAt: template.updatedAt
+      }
+    : null;
+
 export const getSession = async (tenantId: string) => {
   const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
 
@@ -195,7 +324,57 @@ export const getSession = async (tenantId: string) => {
 
     return session;
   });
+  await ensureDefaultTemplates(tenantId, session.id);
   return mapSession(synced);
+};
+
+export const listTemplates = async (tenantId: string) => {
+  const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+
+  if (!session) {
+    return [];
+  }
+
+  await ensureDefaultTemplates(tenantId, session.id);
+
+  return prisma.whatsappMessageTemplate.findMany({
+    where: { tenantId, sessionId: session.id },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+  });
+};
+
+export const updateTemplate = async (tenantId: string, id: string, data: TemplateUpdateInput) => {
+  const template = await prisma.whatsappMessageTemplate.findFirst({ where: { id, tenantId } });
+
+  if (!template) {
+    throw new AppError("WhatsApp message template not found", 404);
+  }
+
+  const updated = await prisma.whatsappMessageTemplate.update({
+    where: { id },
+    data: {
+      title: data.title,
+      body: data.body,
+      enabled: data.enabled
+    }
+  });
+
+  return mapTemplate(updated);
+};
+
+export const deleteTemplate = async (tenantId: string, id: string) => {
+  const template = await prisma.whatsappMessageTemplate.findFirst({ where: { id, tenantId } });
+
+  if (!template) {
+    throw new AppError("WhatsApp message template not found", 404);
+  }
+
+  const updated = await prisma.whatsappMessageTemplate.update({
+    where: { id },
+    data: { enabled: false }
+  });
+
+  return mapTemplate(updated);
 };
 
 export const createOrStartSession = async (tenantId: string): Promise<ReturnType<typeof mapSession>> => {
@@ -225,6 +404,7 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
       lastStatusAt: new Date()
     }
   });
+  await ensureDefaultTemplates(tenantId, session.id);
 
   const webhooks = [
     {
@@ -540,6 +720,7 @@ const handleIncomingMessage = async (
   });
 
   const externalId = getExternalId(payload);
+  let messageCreated = false;
 
   await prisma.whatsappMessage
     .create({
@@ -559,13 +740,47 @@ const handleIncomingMessage = async (
         sentAt: fromMe ? receivedAt : undefined
       }
     })
+    .then(() => {
+      messageCreated = true;
+    })
     .catch((error) => {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return;
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        messageCreated = false;
+        return;
+      }
       throw error;
     });
 
-  if (!fromMe && session.autoReplyEnabled && body) {
-    await sendTextMessage(session.tenantId, chatId, session.welcomeMessage || defaultWelcomeMessage(session.tenant)).catch(async (error) => {
+  if (!fromMe && messageCreated && session.autoReplyEnabled && body) {
+    const botState = conversation.botState && typeof conversation.botState === "object" ? (conversation.botState as Record<string, unknown>) : {};
+    const lastAutoReplyAt = asString(botState.lastAutoReplyAt);
+    const lastAutoReplyTime = lastAutoReplyAt ? new Date(lastAutoReplyAt).getTime() : 0;
+
+    if (Date.now() - lastAutoReplyTime < AUTO_REPLY_COOLDOWN_MS) {
+      return;
+    }
+
+    const renderedMessage = await getRenderedTemplate(session.id, "WELCOME", {
+        ...templateVariablesForTenant(session.tenant),
+        cliente: contactName ?? contactPhone
+      });
+    const message = renderedMessage === null ? session.welcomeMessage || defaultWelcomeMessage(session.tenant) : renderedMessage;
+
+    if (!message) {
+      return;
+    }
+
+    await sendTextMessage(session.tenantId, chatId, message).then(async () => {
+      await prisma.whatsappConversation.update({
+        where: { id: conversation.id },
+        data: {
+          botState: {
+            ...botState,
+            lastAutoReplyAt: new Date().toISOString()
+          }
+        }
+      });
+    }).catch(async (error) => {
       await prisma.whatsappSession.update({
         where: { id: session.id },
         data: { lastError: error instanceof Error ? error.message : "Could not send WhatsApp auto reply" }
@@ -586,7 +801,17 @@ export const notifyOrderStatusChanged = async (tenantId: string, orderId: string
 
   if (!order?.customerPhone || !tenant) return;
 
-  const message = orderStatusMessage({ publicCode: order.publicCode, status: order.status, tenant });
+  const trigger = triggerForOrderStatus(order.status);
+  if (!trigger) return;
+
+  const message = await getRenderedTemplate(session.id, trigger, {
+    ...templateVariablesForTenant(tenant),
+    codigo: order.publicCode,
+    status: order.status,
+    total: Number(order.total).toFixed(2),
+    rastreamento: `${env.FRONTEND_URL.replace(/\/$/, "")}/${tenant.slug}/pedido/${order.publicCode}`
+  });
+
   if (!message) return;
 
   await sendTextMessage(tenantId, order.customerPhone, message).catch(async (error) => {

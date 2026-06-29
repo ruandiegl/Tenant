@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -84,6 +85,19 @@ enum WhatsappSessionStatus {
 enum WhatsappMessageDirection {
   INBOUND
   OUTBOUND
+}
+
+enum WhatsappTemplateTrigger {
+  WELCOME
+  ORDER_PLACED
+  ORDER_ACCEPTED
+  ORDER_PREPARING
+  ORDER_READY
+  ORDER_DISPATCHED
+  ORDER_DELIVERED
+  ORDER_COMPLETED
+  ORDER_CANCELLED
+  ORDER_REJECTED
 }
 
 enum PaymentStatus {
@@ -952,6 +966,7 @@ model WhatsappSession {
   lastError             String?
   conversations         WhatsappConversation[]
   messages              WhatsappMessage[]
+  templates             WhatsappMessageTemplate[]
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
 
@@ -1000,6 +1015,23 @@ model WhatsappMessage {
   @@unique([sessionId, externalId])
   @@index([tenantId, chatId, createdAt])
   @@index([conversationId, createdAt])
+}
+
+model WhatsappMessageTemplate {
+  id          String                  @id @default(cuid())
+  tenantId    String
+  sessionId   String
+  session     WhatsappSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  trigger     WhatsappTemplateTrigger
+  title       String
+  body        String                  @db.Text
+  enabled     Boolean                 @default(true)
+  sortOrder   Int                     @default(0)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@unique([sessionId, trigger])
+  @@index([tenantId, trigger, enabled])
 }
 
 model AuditLog {

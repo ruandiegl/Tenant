@@ -1,7 +1,7 @@
 import "./styles.css";
 import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Image, KeyRound, Loader2, Paintbrush, Percent, Save, ShieldCheck } from "lucide-react";
+import { Building2, Copy, ExternalLink, Image, KeyRound, Loader2, Paintbrush, Percent, Save, ShieldCheck } from "lucide-react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../app/providers/auth-provider";
 import { useTenant } from "../../../app/providers/tenant-provider";
@@ -16,6 +16,7 @@ export function AdminSettings() {
   const { tenant, settings } = useTenant();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const menuUrl = `${window.location.origin}/${tenant.slug}/menu`;
   const { data } = useQuery({ queryKey: ["admin-bundle", tenant.id], queryFn: adminService.getTenantAdminBundle });
   const [form, setForm] = useState({
     name: tenant.name,
@@ -150,6 +151,22 @@ export function AdminSettings() {
             <h2>{tenant.name}</h2>
             <span>{tenant.slug}</span>
             <StatusBadge status={tenant.status} />
+            <div className="settings-menu-url">
+              <strong>{menuUrl}</strong>
+              <button
+                className="ghost-icon-button"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(menuUrl);
+                  toast.success("URL do menu copiada.");
+                }}
+                type="button"
+              >
+                <Copy size={16} /> Copiar
+              </button>
+              <a className="ghost-icon-button" href={menuUrl} rel="noreferrer" target="_blank">
+                <ExternalLink size={16} /> Abrir
+              </a>
+            </div>
           </div>
         </article>
 

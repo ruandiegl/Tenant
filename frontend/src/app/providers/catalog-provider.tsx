@@ -1,4 +1,4 @@
-import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { menuService } from "../../services/menu";
 import { MenuCategory, Product, ProductAvailability, ProductStatus } from "../../types/database";
@@ -51,6 +51,7 @@ type CatalogContextValue = {
 };
 
 const CatalogContext = createContext<CatalogContextValue | null>(null);
+type CatalogData = { categories: MenuCategory[]; products: Product[]; productAvailability: ProductAvailability[] };
 
 function uniqueCategories(categories: MenuCategory[]) {
   const seen = new Set<string>();
@@ -128,31 +129,39 @@ function toProductPayload(draft: ProductDraft) {
 export function CatalogProvider({ children }: PropsWithChildren) {
   const location = useLocation();
   const publicTenantSlug = getPublicTenantSlug(location.pathname);
+  const publicCatalogCache = useRef(new Map<string, CatalogData>());
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productAvailability, setProductAvailability] = useState<ProductAvailability[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const applyCatalog = useCallback((catalog: { categories: MenuCategory[]; products: Product[]; productAvailability: ProductAvailability[] }) => {
+  const applyCatalog = useCallback((catalog: CatalogData) => {
     setCategories(uniqueCategories(catalog.categories));
     setProducts(catalog.products);
     setProductAvailability(catalog.productAvailability);
   }, []);
 
-  const refreshPublicCatalog = useCallback(async () => {
-    setLoading(true);
+  const refreshPublicCatalog = useCallback(async (force = false) => {
     setError(null);
 
     try {
       if (!publicTenantSlug) {
-        setCategories([]);
-        setProducts([]);
-        setProductAvailability([]);
+        setLoading(false);
         return;
       }
 
-      applyCatalog(await menuService.getPublicMenu(publicTenantSlug));
+      const cached = publicCatalogCache.current.get(publicTenantSlug);
+      if (cached && !force) {
+        applyCatalog(cached);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      const catalog = await menuService.getPublicMenu(publicTenantSlug);
+      publicCatalogCache.current.set(publicTenantSlug, catalog);
+      applyCatalog(catalog);
     } catch {
       setError("Nao foi possivel carregar o cardapio.");
     } finally {
@@ -207,26 +216,32 @@ export function CatalogProvider({ children }: PropsWithChildren) {
       getProductStock,
       createCategory: async (draft) => {
         await menuService.createCategory(toCategoryPayload(draft));
+        publicCatalogCache.current.clear();
         await refreshAdminCatalog();
       },
       updateCategory: async (categoryId, draft) => {
         await menuService.updateCategory(categoryId, toCategoryPayload(draft));
+        publicCatalogCache.current.clear();
         await refreshAdminCatalog();
       },
       deleteCategory: async (categoryId) => {
         await menuService.deleteCategory(categoryId);
+        publicCatalogCache.current.clear();
         await refreshAdminCatalog();
       },
       createProduct: async (draft) => {
         await menuService.createProduct(toProductPayload(draft));
+        publicCatalogCache.current.clear();
         await refreshAdminCatalog();
       },
       updateProduct: async (productId, draft) => {
         await menuService.updateProduct(productId, toProductPayload(draft));
+        publicCatalogCache.current.clear();
         await refreshAdminCatalog();
       },
       deleteProduct: async (productId) => {
         await menuService.deleteProduct(productId);
+        publicCatalogCache.current.clear();
         await refreshAdminCatalog();
       },
       decrementStock: (productId, quantity) => {

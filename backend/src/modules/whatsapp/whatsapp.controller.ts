@@ -49,6 +49,30 @@ export const sendTestMessage: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const listTemplates: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.listTemplates(req.tenantId!));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateTemplate: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.updateTemplate(req.tenantId!, req.params.id, req.body));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const deleteTemplate: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.deleteTemplate(req.tenantId!, req.params.id));
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const webhook: RequestHandler = async (req, res, next) => {
   try {
     return res.json(

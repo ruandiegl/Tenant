@@ -306,6 +306,7 @@ export type TenantCreatePayload = {
 
 export type TenantUpdatePayload = {
   name?: string;
+  slug?: string;
   legalName?: string | null;
   document?: string | null;
   email?: string | null;

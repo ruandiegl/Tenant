@@ -4,6 +4,7 @@ import morgan from "morgan";
 import { createRequire } from "node:module";
 import path from "node:path";
 import swaggerUi from "swagger-ui-express";
+import { corsOrigin } from "./config/cors.js";
 import { env } from "./config/env.js";
 import { prisma } from "./config/prisma.js";
 import { swaggerSpec } from "./config/swagger.js";
@@ -29,7 +30,7 @@ const helmet = nodeRequire("helmet") as (options?: Record<string, unknown>) => e
 export const app = express();
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: "8mb", verify: (req, _res, buffer) => { (req as express.Request).rawBody = Buffer.from(buffer); } }));
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));

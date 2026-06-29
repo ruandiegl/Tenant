@@ -4,6 +4,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, Store } from "lucide-react";
 import { BrandLogo } from "../../../components/brand-logo";
 import { useAuth } from "../../../app/providers/auth-provider";
+import { isApiBaseUrlConfigured } from "../../../services/api";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const showApiConfigWarning = import.meta.env.PROD && !isApiBaseUrlConfigured();
 
   if (isAuthenticated) {
     return <Navigate to={can("platform.tenants.read") ? "/superadmin" : "/admin"} replace />;
@@ -62,6 +64,10 @@ export function LoginPage() {
             <h2>Entrar no painel</h2>
             <p>{accessMode === "tenant" ? "Use suas credenciais do tenant." : "Acesso restrito a operadores PodePedir."}</p>
           </div>
+
+          {showApiConfigWarning ? (
+            <p className="form-error">API de producao nao configurada. Defina VITE_API_BASE_URL no Vercel.</p>
+          ) : null}
 
           <div className="auth-mode-switch" aria-label="Tipo de acesso">
             <button className={accessMode === "tenant" ? "active" : ""} onClick={() => setAccessMode("tenant")} type="button">

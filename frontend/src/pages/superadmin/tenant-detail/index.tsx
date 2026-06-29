@@ -2,7 +2,7 @@ import "../styles.css";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarClock, Copy, Edit3, Eye, Loader2, Save, ShieldAlert, Store, Users } from "lucide-react";
+import { ArrowLeft, CalendarClock, Copy, Edit3, ExternalLink, Eye, Loader2, Save, ShieldAlert, Store, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
@@ -20,6 +20,7 @@ const statusOptions: Array<{ value: TenantStatus; label: string }> = [
 
 const initialEditForm: TenantUpdatePayload = {
   name: "",
+  slug: "",
   legalName: "",
   document: "",
   email: "",
@@ -47,6 +48,15 @@ function clean(value?: string | null) {
   return next ? next : undefined;
 }
 
+function slugify(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function SuperAdminTenantDetail() {
   const { id = "" } = useParams();
   const location = useLocation();
@@ -67,6 +77,11 @@ export function SuperAdminTenantDetail() {
     queryFn: tenantManagementService.listPlans
   });
   const activePlans = useMemo(() => plans.filter((plan) => plan.status === "ACTIVE"), [plans]);
+  const menuUrl = useMemo(() => {
+    if (!tenant?.slug) return "";
+
+    return `${window.location.origin}/${tenant.slug}/menu`;
+  }, [tenant?.slug]);
 
   useEffect(() => {
     if (!tenant) return;
@@ -75,6 +90,7 @@ export function SuperAdminTenantDetail() {
     setPlanId(tenant.plan.id ?? activePlans[0]?.id ?? "");
     setEditForm({
       name: tenant.name,
+      slug: tenant.slug,
       legalName: tenant.legalName ?? "",
       document: tenant.document ?? "",
       email: tenant.email ?? "",
@@ -157,6 +173,7 @@ export function SuperAdminTenantDetail() {
 
     await updateMutation.mutateAsync({
       name: editForm.name,
+      slug: clean(editForm.slug) ? slugify(editForm.slug ?? "") : undefined,
       legalName: clean(editForm.legalName) || null,
       document: clean(editForm.document) || null,
       email: clean(editForm.email) || null,
@@ -231,6 +248,31 @@ export function SuperAdminTenantDetail() {
           </div>
         </article>
 
+        <article className="panel tms-tenant-profile">
+          <span className="tms-profile-mark">
+            <ExternalLink size={22} />
+          </span>
+          <div>
+            <h2>URL do menu</h2>
+            <p>{menuUrl}</p>
+          </div>
+          <div className="tms-profile-badges">
+            <button
+              className="ghost-icon-button"
+              onClick={async () => {
+                await navigator.clipboard.writeText(menuUrl);
+                toast.success("URL do menu copiada.");
+              }}
+              type="button"
+            >
+              <Copy size={16} /> Copiar
+            </button>
+            <a className="ghost-icon-button" href={menuUrl} rel="noreferrer" target="_blank">
+              <ExternalLink size={16} /> Abrir
+            </a>
+          </div>
+        </article>
+
         <article className="panel tms-usage-panel">
           <div className="tms-panel-title">
             <h2>Uso do plano</h2>
@@ -257,6 +299,16 @@ export function SuperAdminTenantDetail() {
                 <span>Nome comercial</span>
                 <div>
                   <input onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))} value={editForm.name ?? ""} />
+                </div>
+              </label>
+              <label className="field">
+                <span>URL do menu</span>
+                <div>
+                  <input
+                    onBlur={() => setEditForm((current) => ({ ...current, slug: slugify(current.slug ?? current.name ?? "") }))}
+                    onChange={(event) => setEditForm((current) => ({ ...current, slug: slugify(event.target.value) }))}
+                    value={editForm.slug ?? ""}
+                  />
                 </div>
               </label>
               <label className="field">

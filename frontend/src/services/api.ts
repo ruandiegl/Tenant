@@ -1,7 +1,8 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3333";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3333").replace(/\/$/, "");
 const DEMO_TENANT_SLUG = import.meta.env.VITE_DEMO_TENANT_SLUG ?? "demo-burger";
 const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL ?? "admin@demo.local";
 const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD ?? "admin123";
+export const SESSION_EXPIRED_EVENT = "podepedir:session-expired";
 
 type LoginResponse = {
   token: string;
@@ -40,11 +41,19 @@ export function setSession(token: string, tenantId?: string | null) {
   }
 }
 
-export function clearSession() {
+export function isApiBaseUrlConfigured() {
+  return Boolean(import.meta.env.VITE_API_BASE_URL);
+}
+
+export function clearSession(options: { notify?: boolean } = {}) {
   tokenMemory = null;
   tenantIdMemory = null;
   window.localStorage.removeItem("podepedir.token");
   window.localStorage.removeItem("podepedir.tenantId");
+
+  if (options.notify) {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
 }
 
 export async function loginRequest(credentials?: { email: string; password: string; tenantSlug?: string }) {
@@ -103,6 +112,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       message = fieldErrors || data?.message || message;
     } catch {
       // Keep the generic status message when the response is not JSON.
+    }
+
+    if (response.status === 401) {
+      clearSession({ notify: true });
     }
 
     throw new Error(message);

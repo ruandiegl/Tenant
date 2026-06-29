@@ -1,7 +1,7 @@
-import { createContext, PropsWithChildren, useContext, useMemo, useState } from "react";
+import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authService } from "../../services/auth";
-import { getAuthToken } from "../../services/api";
+import { clearSession, getAuthToken, SESSION_EXPIRED_EVENT } from "../../services/api";
 import { PlanCapabilities, TenantUser } from "../../types/database";
 
 type AuthContextValue = {
@@ -19,12 +19,34 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const [hasToken, setHasToken] = useState(Boolean(getAuthToken()));
-  const { data: user = null, isLoading } = useQuery({
+  const { data: user = null, isError, isLoading } = useQuery({
     queryKey: ["auth", "me"],
     queryFn: authService.getCurrentUser,
     enabled: hasToken,
     retry: false
   });
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setHasToken(false);
+      queryClient.setQueryData(["auth", "me"], null);
+      queryClient.removeQueries({ queryKey: ["auth"] });
+      queryClient.removeQueries({ queryKey: ["tenant"] });
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (!hasToken || !isError) return;
+
+    clearSession();
+    setHasToken(false);
+    queryClient.setQueryData(["auth", "me"], null);
+    queryClient.removeQueries({ queryKey: ["auth"] });
+    queryClient.removeQueries({ queryKey: ["tenant"] });
+  }, [hasToken, isError, queryClient]);
   const loginMutation = useMutation({
     mutationFn: authService.login,
     onSuccess: async (nextUser) => {

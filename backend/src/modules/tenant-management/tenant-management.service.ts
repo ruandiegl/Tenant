@@ -200,6 +200,7 @@ type PlanInput = {
 
 type TenantUpdateInput = {
   name?: string;
+  slug?: string;
   legalName?: string | null;
   document?: string | null;
   email?: string | null;
@@ -918,10 +919,19 @@ export const updateTenant = async (id: string, data: TenantUpdateInput, actor: A
     throw new AppError("Tenant not found", 404);
   }
 
+  if (data.slug && data.slug !== tenant.slug) {
+    const existing = await prisma.tenant.findUnique({ where: { slug: data.slug } });
+
+    if (existing && existing.id !== id) {
+      throw new AppError("Slug already in use", 409);
+    }
+  }
+
   const updated = await prisma.tenant.update({
     where: { id },
     data: {
       name: data.name,
+      slug: data.slug,
       legalName: data.legalName,
       document: data.document,
       email: data.email,
@@ -989,6 +999,7 @@ export const updateTenant = async (id: string, data: TenantUpdateInput, actor: A
     entityId: id,
     before: {
       name: tenant.name,
+      slug: tenant.slug,
       legalName: tenant.legalName,
       document: tenant.document,
       email: tenant.email,
