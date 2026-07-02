@@ -87,7 +87,7 @@ const emitOrderEvent = (event: string, order: { id: string; tenantId: string; br
 export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInput) => {
   const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, include: { settings: true } });
 
-  if (!tenant || tenant.status !== "ACTIVE") {
+  if (!tenant || !["ACTIVE", "TRIAL"].includes(tenant.status)) {
     throw new AppError("Tenant not found or unavailable", 404);
   }
 
@@ -338,7 +338,7 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
 export const getPublicOrder = async (tenantSlug: string, publicCodeValue: string) => {
   const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug } });
 
-  if (!tenant) {
+  if (!tenant || !["ACTIVE", "TRIAL"].includes(tenant.status)) {
     throw new AppError("Tenant not found", 404);
   }
 

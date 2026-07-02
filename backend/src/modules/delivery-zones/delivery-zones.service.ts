@@ -59,7 +59,7 @@ export const listDeliveryZones = (tenantId: string) => {
 export const listPublicDeliveryZones = async (tenantSlug: string) => {
   const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug } });
 
-  if (!tenant || tenant.status !== "ACTIVE") {
+  if (!tenant || !["ACTIVE", "TRIAL"].includes(tenant.status)) {
     throw new AppError("Tenant not found or unavailable", 404);
   }
 

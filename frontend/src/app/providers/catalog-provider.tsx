@@ -147,6 +147,7 @@ export function CatalogProvider({ children }: PropsWithChildren) {
 
     try {
       if (!publicTenantSlug) {
+        applyCatalog({ categories: [], products: [], productAvailability: [] });
         setLoading(false);
         return;
       }
@@ -163,6 +164,7 @@ export function CatalogProvider({ children }: PropsWithChildren) {
       publicCatalogCache.current.set(publicTenantSlug, catalog);
       applyCatalog(catalog);
     } catch {
+      applyCatalog({ categories: [], products: [], productAvailability: [] });
       setError("Nao foi possivel carregar o cardapio.");
     } finally {
       setLoading(false);

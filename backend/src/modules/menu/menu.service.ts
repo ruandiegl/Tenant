@@ -541,7 +541,7 @@ export const deleteProductTemplate = async (tenantId: string, id: string) => {
 export const getPublicMenu = async (tenantSlug: string, branchId?: string) => {
   const tenant = await prisma.tenant.findUnique({ where: { slug: resolveTenantSlugAlias(tenantSlug) }, include: { settings: true } });
 
-  if (!tenant || tenant.status !== "ACTIVE") {
+  if (!tenant || !["ACTIVE", "TRIAL"].includes(tenant.status)) {
     throw new AppError("Tenant not found or unavailable", 404);
   }
 

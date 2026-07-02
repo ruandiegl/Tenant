@@ -102,7 +102,7 @@ export const getPublicTenant = async (slug: string) => {
     include: { settings: true, branches: { where: { status: "ACTIVE" } } }
   });
 
-  if (!tenant || tenant.status !== "ACTIVE") {
+  if (!tenant || !["ACTIVE", "TRIAL"].includes(tenant.status)) {
     throw new AppError("Tenant not found or unavailable", 404);
   }
 

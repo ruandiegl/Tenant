@@ -18,7 +18,7 @@ export function TenantProvider({ children }: PropsWithChildren) {
   const location = useLocation();
   const publicTenantSlug = getPublicTenantSlug(location.pathname);
   const shouldFetchTenant = Boolean(publicTenantSlug || getTenantId());
-  const { data, isLoading } = useQuery({
+  const { data, isError, isLoading } = useQuery({
     enabled: shouldFetchTenant,
     queryKey: ["tenant", "current", publicTenantSlug ?? getTenantId() ?? "default"],
     queryFn: () => tenantsService.getCurrentTenant(publicTenantSlug),
@@ -34,6 +34,17 @@ export function TenantProvider({ children }: PropsWithChildren) {
 
   if (shouldFetchTenant && isLoading && !data) {
     return <section className="screen"><div className="panel">Carregando restaurante...</div></section>;
+  }
+
+  if (shouldFetchTenant && isError && !data) {
+    return (
+      <section className="screen">
+        <div className="panel">
+          <h1>Restaurante indisponivel</h1>
+          <p className="muted-text">Nao foi possivel carregar este tenant. Confira se o link esta correto ou se o tenant esta ativo.</p>
+        </div>
+      </section>
+    );
   }
 
   return <TenantContext.Provider value={tenantBundle}>{children}</TenantContext.Provider>;
