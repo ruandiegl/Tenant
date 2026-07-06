@@ -1,0 +1,99 @@
+.branch-form-panel,
+.branch-list-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.branch-switches {
+  align-content: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.branch-switches label {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 850;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.branch-switches input {
+  accent-color: var(--brand);
+}
+
+.full-field {
+  grid-column: 1 / -1;
+}
+
+.branch-list {
+  display: grid;
+  gap: 8px;
+}
+
+.branch-card {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  padding: 12px;
+}
+
+.branch-card div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.branch-card strong,
+.branch-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-card span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.branch-card button {
+  background: var(--surface-strong);
+  border: 0;
+  border-radius: 8px;
+  color: var(--brand-dark);
+  font-weight: 850;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.branch-card .danger-link-button {
+  align-items: center;
+  color: var(--danger);
+  display: inline-flex;
+  justify-content: center;
+  padding: 0;
+  width: 38px;
+}
+
+@media (max-width: 520px) {
+  .branch-card {
+    grid-template-columns: 1fr auto;
+  }
+
+  .branch-card .status-badge,
+  .branch-card button {
+    justify-self: start;
+  }
+}

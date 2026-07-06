@@ -47,11 +47,12 @@
 .admin-sidebar-nav {
   align-content: start;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   padding: 28px 0;
 }
 
-.admin-sidebar-nav a {
+.admin-sidebar-nav a,
+.admin-nav-group summary {
   align-items: center;
   border-radius: 8px;
   color: #eef5f2;
@@ -63,9 +64,58 @@
   padding: 0 12px 0 8px;
 }
 
+.admin-nav-group {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-nav-group summary {
+  cursor: pointer;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  list-style: none;
+}
+
+.admin-nav-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-nav-group summary::after {
+  color: #aebbd0;
+  content: "⌄";
+  font-size: 0.92rem;
+  justify-self: end;
+  transition: transform 180ms ease;
+}
+
+.admin-nav-group[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.admin-nav-group-content {
+  display: grid;
+  gap: 6px;
+  padding-left: 12px;
+}
+
+.admin-nav-group-content a {
+  min-height: 42px;
+}
+
+.admin-nav-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
 .admin-sidebar-nav a.active {
   background: var(--brand);
   box-shadow: 0 12px 30px rgba(23, 107, 91, 0.22);
+}
+
+.admin-nav-group:has(a.active) summary {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .admin-nav-icon {
@@ -144,6 +194,7 @@
 
   .admin-brand,
   .admin-sidebar-nav a,
+  .admin-nav-group summary,
   .admin-user-card {
     grid-template-columns: 1fr;
     justify-items: center;
@@ -152,9 +203,14 @@
 
   .admin-brand div,
   .admin-sidebar-nav span:not(.admin-nav-icon),
+  .admin-nav-group summary::after,
   .admin-user-card div,
   .admin-user-card button,
   .admin-tenant-chip {
     display: none;
+  }
+
+  .admin-nav-group-content {
+    padding-left: 0;
   }
 }

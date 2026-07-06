@@ -1,26 +1,42 @@
 import "./styles.css";
 import { PropsWithChildren, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { BarChart3, Bike, ChefHat, LogOut, Menu as MenuIcon, MessageCircle, ReceiptText, Settings, Store } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { BarChart3, Bike, Building2, ChefHat, LogOut, Menu as MenuIcon, MessageCircle, ReceiptText, Settings, Store } from "lucide-react";
 import { BrandLogo } from "../../../components/brand-logo";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { useAuth } from "../../providers/auth-provider";
 import { useTenant } from "../../providers/tenant-provider";
 
-const adminNavItems = [
-  { to: "/admin", label: "Dashboard", icon: BarChart3, end: true },
-  { to: "/admin/pedidos", label: "Pedidos", icon: ReceiptText },
-  { to: "/admin/cardapio", label: "Cardapio", icon: MenuIcon },
-  { to: "/admin/cozinha", label: "Cozinha", icon: ChefHat },
-  { to: "/admin/entregas", label: "Entregas", icon: Bike },
-  { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { to: "/admin/config", label: "Configuracoes", icon: Settings }
+const dashboardItem = { to: "/admin", label: "Dashboard", icon: BarChart3, end: true, permission: "tenant.reports.read" };
+const adminNavGroups = [
+  {
+    label: "Cozinha",
+    icon: ChefHat,
+    items: [
+      { to: "/admin/pedidos", label: "Pedidos", icon: ReceiptText, permission: "tenant.orders.read" },
+      { to: "/admin/cardapio", label: "Cardapio", icon: MenuIcon, permission: "tenant.menu.read" },
+      { to: "/admin/cozinha", label: "Fila da cozinha", icon: ChefHat, permission: "tenant.kitchen.read" }
+    ]
+  },
+  {
+    label: "Logistica",
+    icon: Bike,
+    items: [
+      { to: "/admin/entregas", label: "Painel de entregas", icon: Bike, permission: "tenant.branches.read", end: true },
+      { to: "/admin/entregas/filiais", label: "Cadastro de filiais", icon: Building2, permission: "tenant.branches.read" }
+    ]
+  }
+];
+const adminSupportItems = [
+  { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle, permission: "tenant.settings.read" },
+  { to: "/admin/config", label: "Configuracoes", icon: Settings, permission: "tenant.branches.read" }
 ];
 
 export function AdminLayout({ children }: PropsWithChildren) {
   const { settings } = useTenant();
-  const { user, logout } = useAuth();
+  const { user, logout, can } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -47,14 +63,53 @@ export function AdminLayout({ children }: PropsWithChildren) {
         </div>
 
         <nav className="admin-sidebar-nav">
-          {adminNavItems.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end}>
+          {can(dashboardItem.permission) ? (
+            <NavLink key={dashboardItem.to} to={dashboardItem.to} end={dashboardItem.end} title={dashboardItem.label}>
               <span className="admin-nav-icon">
-                <item.icon size={18} aria-hidden="true" />
+                <dashboardItem.icon size={18} aria-hidden="true" />
               </span>
-              <span>{item.label}</span>
+              <span>{dashboardItem.label}</span>
             </NavLink>
-          ))}
+          ) : null}
+
+          {adminNavGroups.map((group) => {
+            const items = group.items.filter((item) => can(item.permission));
+            if (items.length === 0) return null;
+
+            const isGroupActive = items.some((item) => (item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)));
+
+            return (
+              <details className="admin-nav-group" key={group.label} open={isGroupActive}>
+                <summary title={group.label}>
+                  <span className="admin-nav-icon">
+                    <group.icon size={18} aria-hidden="true" />
+                  </span>
+                  <span>{group.label}</span>
+                </summary>
+                <div className="admin-nav-group-content">
+                  {items.map((item) => (
+                    <NavLink key={item.to} to={item.to} end={item.end} title={item.label}>
+                      <span className="admin-nav-icon">
+                        <item.icon size={18} aria-hidden="true" />
+                      </span>
+                      <span>{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              </details>
+            );
+          })}
+
+          <div className="admin-nav-section">
+            {adminSupportItems.filter((item) => can(item.permission)).map((item) => (
+              <NavLink key={item.to} to={item.to} title={item.label}>
+                <span className="admin-nav-icon">
+                  <item.icon size={18} aria-hidden="true" />
+                </span>
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
         </nav>
 
         <div className="admin-sidebar-footer">

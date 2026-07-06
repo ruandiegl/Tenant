@@ -8,6 +8,11 @@
   gap: 14px;
 }
 
+.branch-form-panel,
+.branch-list-panel {
+  grid-column: 1 / -1;
+}
+
 .delivery-heading {
   align-items: start;
   display: flex;
@@ -24,6 +29,89 @@
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.branch-switches {
+  align-content: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.branch-switches label {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 850;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.branch-switches input {
+  accent-color: var(--brand);
+}
+
+.full-field {
+  grid-column: 1 / -1;
+}
+
+.branch-list {
+  display: grid;
+  gap: 8px;
+}
+
+.branch-card {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  padding: 12px;
+}
+
+.branch-card div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.branch-card strong,
+.branch-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-card span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.branch-card button {
+  background: var(--surface-strong);
+  border: 0;
+  border-radius: 8px;
+  color: var(--brand-dark);
+  font-weight: 850;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.branch-card .danger-link-button {
+  align-items: center;
+  color: var(--danger);
+  display: inline-flex;
+  justify-content: center;
+  padding: 0;
+  width: 38px;
 }
 
 .delivery-map-card {
@@ -61,6 +149,42 @@
   min-height: 150px;
   padding: 20px;
   text-align: center;
+}
+
+.radius-map-target {
+  align-items: center;
+  display: grid;
+  justify-items: center;
+  min-height: 92px;
+  position: relative;
+  width: 100%;
+}
+
+.radius-map-target > span {
+  background: rgba(30, 107, 60, 0.08);
+  border: 1px dashed rgba(30, 107, 60, 0.32);
+  border-radius: 999px;
+  height: 62px;
+  position: absolute;
+  transform: scale(0.8);
+  transition: transform 260ms cubic-bezier(0.34, 1.2, 0.64, 1);
+  width: 62px;
+}
+
+.radius-map-target.active > span {
+  background: rgba(30, 107, 60, 0.14);
+  border-color: rgba(30, 107, 60, 0.62);
+  height: min(128px, 58vw);
+  transform: scale(1);
+  width: min(128px, 58vw);
+}
+
+.radius-map-target svg {
+  background: var(--brand-dark);
+  border-radius: 999px;
+  color: white;
+  padding: 8px;
+  position: relative;
 }
 
 .delivery-map-preview span {
@@ -131,10 +255,13 @@
 }
 
 @media (max-width: 520px) {
+  .branch-card,
   .delivery-zone-card {
     grid-template-columns: 1fr auto;
   }
 
+  .branch-card .status-badge,
+  .branch-card button,
   .delivery-zone-card .status-badge,
   .delivery-zone-card button {
     justify-self: start;

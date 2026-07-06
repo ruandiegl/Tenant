@@ -12,11 +12,13 @@ import { deliveryZonesService, DeliveryZonePayload } from "../../../services/del
 import { DeliveryZone } from "../../../types/database";
 import { formatCurrency } from "../../../utils/format";
 import { formatCep, onlyDigits } from "../../../utils/input-masks";
+import { parseMoneyInput } from "../../../utils/money";
 
 type ZoneForm = {
   branchId: string;
   name: string;
-  type: "POSTAL_CODE" | "RADIUS";
+  type: "NEIGHBORHOOD" | "POSTAL_CODE" | "RADIUS" | "RADIUS_OVERFLOW";
+  neighborhood: string;
   postalCodeStart: string;
   postalCodeEnd: string;
   radiusKm: string;
@@ -29,15 +31,48 @@ type ZoneForm = {
 const emptyZoneForm: ZoneForm = {
   branchId: "",
   name: "",
-  type: "POSTAL_CODE",
+  type: "NEIGHBORHOOD",
+  neighborhood: "",
   postalCodeStart: "",
   postalCodeEnd: "",
-  radiusKm: "5",
-  fee: "8",
-  minimumOrderValue: "0",
+  radiusKm: "5,0",
+  fee: "R$ 8,00",
+  minimumOrderValue: "R$ 0,00",
   estimatedMinutes: "35",
   status: "ACTIVE"
 };
+
+function parseDecimalInput(value: string) {
+  const normalized = value.replace(/[^\d,.]/g, "").replace(",", ".");
+  return Number(normalized || 0);
+}
+
+function formatKmInput(value: string | number | undefined) {
+  if (value === undefined || value === "") return "";
+
+  const parsed = typeof value === "number" ? value : parseDecimalInput(value);
+  if (!Number.isFinite(parsed)) return "";
+
+  return new Intl.NumberFormat("pt-BR", {
+    maximumFractionDigits: 2
+  }).format(parsed);
+}
+
+function formatKmMask(value: string) {
+  const digits = onlyDigits(value);
+  if (!digits) return "";
+
+  const parsed = Number(digits) / 10;
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  }).format(parsed);
+}
+
+function formatMoneyMask(value: string) {
+  const hasDigits = Boolean(value.replace(/\D/g, ""));
+  return hasDigits ? formatCurrency(parseMoneyInput(value)) : "";
+}
 
 export function AdminDeliveries() {
   const { tenant, settings } = useTenant();
@@ -84,15 +119,26 @@ export function AdminDeliveries() {
       return;
     }
 
+    if (zoneForm.type === "NEIGHBORHOOD" && !zoneForm.neighborhood.trim()) {
+      toast.warning("Informe o bairro atendido.");
+      return;
+    }
+
+    if (zoneForm.type === "RADIUS" && parseDecimalInput(zoneForm.radiusKm || "0") <= 0) {
+      toast.warning("Informe um raio maior que zero.");
+      return;
+    }
+
     await saveZoneMutation.mutateAsync({
       branchId: zoneForm.branchId,
       name: zoneForm.name || "Area padrao",
       type: zoneForm.type,
+      neighborhood: zoneForm.type === "NEIGHBORHOOD" ? zoneForm.neighborhood.trim() : undefined,
       postalCodeStart: zoneForm.type === "POSTAL_CODE" ? onlyDigits(zoneForm.postalCodeStart) : undefined,
       postalCodeEnd: zoneForm.type === "POSTAL_CODE" ? onlyDigits(zoneForm.postalCodeEnd) : undefined,
-      radiusKm: zoneForm.type === "RADIUS" ? Number(zoneForm.radiusKm || 0) : undefined,
-      fee: Number(zoneForm.fee || 0),
-      minimumOrderValue: Number(zoneForm.minimumOrderValue || 0),
+      radiusKm: zoneForm.type === "RADIUS" ? parseDecimalInput(zoneForm.radiusKm || "0") : undefined,
+      fee: parseMoneyInput(zoneForm.fee || "0"),
+      minimumOrderValue: parseMoneyInput(zoneForm.minimumOrderValue || "0"),
       estimatedMinutes: zoneForm.estimatedMinutes ? Number(zoneForm.estimatedMinutes) : undefined,
       status: zoneForm.status
     });
@@ -104,11 +150,12 @@ export function AdminDeliveries() {
       branchId: zone.branchId,
       name: zone.name,
       type: zone.type,
+      neighborhood: zone.neighborhood ?? "",
       postalCodeStart: formatCep(zone.postalCodeStart ?? ""),
       postalCodeEnd: formatCep(zone.postalCodeEnd ?? ""),
-      radiusKm: String(zone.radiusKm ?? 5),
-      fee: String(zone.fee),
-      minimumOrderValue: String(zone.minimumOrderValue),
+      radiusKm: formatKmInput(zone.radiusKm ?? 5),
+      fee: formatCurrency(zone.fee),
+      minimumOrderValue: formatCurrency(zone.minimumOrderValue),
       estimatedMinutes: String(zone.estimatedMinutes ?? 35),
       status: zone.status
     });
@@ -125,7 +172,7 @@ export function AdminDeliveries() {
       <PageHeader
         eyebrow="Logistica"
         title="Entregas"
-        description="Configure taxas por CEP ou raio e visualize a base de saida do motoboy."
+        description="Configure taxas por bairro ou raio e visualize a base de saida do motoboy."
       />
 
       <div className="deliveries-grid">
@@ -169,12 +216,22 @@ export function AdminDeliveries() {
             <label className="field">
               <span>Tipo de calculo</span>
               <div>
-                <select value={zoneForm.type} onChange={(event) => setZoneForm((current) => ({ ...current, type: event.target.value as "POSTAL_CODE" | "RADIUS" }))}>
+                <select value={zoneForm.type} onChange={(event) => setZoneForm((current) => ({ ...current, type: event.target.value as ZoneForm["type"] }))}>
+                  <option value="NEIGHBORHOOD">Bairro manual</option>
+                  <option value="RADIUS">Faixa por raio</option>
+                  <option value="RADIUS_OVERFLOW">Acima do maior raio</option>
                   <option value="POSTAL_CODE">Faixa de CEP</option>
-                  <option value="RADIUS">Raio em km</option>
                 </select>
               </div>
             </label>
+            {zoneForm.type === "NEIGHBORHOOD" ? (
+              <label className="field">
+                <span>Bairro atendido</span>
+                <div>
+                  <input value={zoneForm.neighborhood} onChange={(event) => setZoneForm((current) => ({ ...current, neighborhood: event.target.value }))} placeholder="Ex: Centro" />
+                </div>
+              </label>
+            ) : null}
             {zoneForm.type === "POSTAL_CODE" ? (
               <>
                 <label className="field">
@@ -190,24 +247,48 @@ export function AdminDeliveries() {
                   </div>
                 </label>
               </>
-            ) : (
+            ) : zoneForm.type === "RADIUS" ? (
               <label className="field">
                 <span>Raio maximo</span>
                 <div>
-                  <input min="0" step="0.1" type="number" value={zoneForm.radiusKm} onChange={(event) => setZoneForm((current) => ({ ...current, radiusKm: event.target.value }))} />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={zoneForm.radiusKm}
+                    onBlur={(event) => setZoneForm((current) => ({ ...current, radiusKm: formatKmInput(event.target.value) }))}
+                    onChange={(event) => setZoneForm((current) => ({ ...current, radiusKm: formatKmMask(event.target.value) }))}
+                    placeholder="0,0"
+                  />
                 </div>
               </label>
-            )}
+            ) : zoneForm.type === "RADIUS_OVERFLOW" ? (
+              <div className="field">
+                <span>Regra da faixa</span>
+                <small className="muted-text">Usada quando a distancia passar do maior raio ativo cadastrado.</small>
+              </div>
+            ) : null}
             <label className="field">
               <span>Taxa</span>
               <div>
-                <input min="0" step="0.01" type="number" value={zoneForm.fee} onChange={(event) => setZoneForm((current) => ({ ...current, fee: event.target.value }))} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={zoneForm.fee}
+                  onChange={(event) => setZoneForm((current) => ({ ...current, fee: formatMoneyMask(event.target.value) }))}
+                  placeholder="R$ 0,00"
+                />
               </div>
             </label>
             <label className="field">
               <span>Pedido minimo</span>
               <div>
-                <input min="0" step="0.01" type="number" value={zoneForm.minimumOrderValue} onChange={(event) => setZoneForm((current) => ({ ...current, minimumOrderValue: event.target.value }))} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={zoneForm.minimumOrderValue}
+                  onChange={(event) => setZoneForm((current) => ({ ...current, minimumOrderValue: formatMoneyMask(event.target.value) }))}
+                  placeholder="R$ 0,00"
+                />
               </div>
             </label>
             <label className="field">
@@ -238,8 +319,19 @@ export function AdminDeliveries() {
             <p>{selectedBranch?.address ? `${selectedBranch.address.street}, ${selectedBranch.address.number} - ${selectedBranch.address.district}` : "Cadastre o endereco da filial para melhorar a rota."}</p>
           </div>
           <div className="delivery-map-preview">
-            <MapPinned size={34} />
-            <span>{zoneForm.type === "RADIUS" ? `${zoneForm.radiusKm || 0} km de raio` : "Faixas de CEP ativas"}</span>
+            <div className={zoneForm.type === "RADIUS" ? "radius-map-target active" : "radius-map-target"}>
+              <span />
+              <MapPinned size={34} />
+            </div>
+            <span>
+              {zoneForm.type === "RADIUS"
+                ? `${zoneForm.radiusKm || "0,0"} km de raio`
+                : zoneForm.type === "RADIUS_OVERFLOW"
+                  ? "Acima do maior raio"
+                  : zoneForm.type === "NEIGHBORHOOD"
+                    ? "Entrega por bairro"
+                    : "Faixas de CEP ativas"}
+            </span>
           </div>
           <a className="wide-link" href={mapUrl} rel="noreferrer" target="_blank">
             Abrir no mapa
@@ -256,7 +348,11 @@ export function AdminDeliveries() {
                   <span>
                     {zone.type === "POSTAL_CODE"
                       ? `${formatCep(zone.postalCodeStart ?? "")} ate ${formatCep(zone.postalCodeEnd ?? "")}`
-                      : `Raio de ${zone.radiusKm ?? 0} km`}
+                      : zone.type === "NEIGHBORHOOD"
+                        ? zone.neighborhood ?? "Bairro nao informado"
+                        : zone.type === "RADIUS_OVERFLOW"
+                          ? "Acima do maior raio cadastrado"
+                          : `Ate ${zone.radiusKm ?? 0} km`}
                   </span>
                 </div>
                 <div>

@@ -1,0 +1,3 @@
+ALTER TYPE "DeliveryZoneType" ADD VALUE IF NOT EXISTS 'NEIGHBORHOOD';
+
+ALTER TABLE "DeliveryZone" ADD COLUMN "neighborhood" TEXT;

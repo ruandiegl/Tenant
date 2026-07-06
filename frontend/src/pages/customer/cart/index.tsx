@@ -15,21 +15,123 @@ import { formatCep, formatPhone, onlyDigits } from "../../../utils/input-masks";
 import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../../../utils/public-tenant-route";
 
 type CheckoutStep = "cart" | "address" | "payment" | "done";
+type GeoPoint = { lat: number; lng: number };
+type ZoneDistanceMap = Record<string, number>;
 
-function findDeliveryZone(zones: DeliveryZone[], postalCode: string, subtotal: number) {
-  const cep = Number(onlyDigits(postalCode));
+const geocodeCache = new Map<string, GeoPoint | null>();
 
-  return zones.find((zone) => {
-    if (zone.status !== "ACTIVE" || subtotal < zone.minimumOrderValue) return false;
+function normalizeZoneText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
-    if (zone.type === "POSTAL_CODE") {
-      const start = Number(onlyDigits(zone.postalCodeStart ?? ""));
-      const end = Number(onlyDigits(zone.postalCodeEnd ?? ""));
-      return Boolean(cep && start && end && cep >= start && cep <= end);
-    }
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
 
-    return true;
+function distanceInKm(origin: GeoPoint, destination: GeoPoint) {
+  const earthRadiusKm = 6371;
+  const deltaLat = toRadians(destination.lat - origin.lat);
+  const deltaLng = toRadians(destination.lng - origin.lng);
+  const lat1 = toRadians(origin.lat);
+  const lat2 = toRadians(destination.lat);
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function addressToQuery(address: {
+  street?: string;
+  number?: string;
+  district?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+}) {
+  return [address.street, address.number, address.district, address.city, address.state, address.postalCode, "Brasil"]
+    .filter(Boolean)
+    .join(", ");
+}
+
+async function geocodeAddress(query: string, signal?: AbortSignal) {
+  const normalized = normalizeZoneText(query);
+  const cached = geocodeCache.get(normalized);
+
+  if (cached !== undefined) return cached;
+
+  const params = new URLSearchParams({
+    q: query,
+    format: "json",
+    limit: "1",
+    countrycodes: "br"
   });
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+    signal,
+    headers: { Accept: "application/json" }
+  });
+
+  if (!response.ok) {
+    geocodeCache.set(normalized, null);
+    return null;
+  }
+
+  const [result] = (await response.json()) as Array<{ lat: string; lon: string }>;
+  const point = result ? { lat: Number(result.lat), lng: Number(result.lon) } : null;
+  geocodeCache.set(normalized, point);
+  return point;
+}
+
+function findDeliveryZone(
+  zones: DeliveryZone[],
+  address: { district: string; postalCode: string },
+  subtotal: number,
+  zoneDistances: ZoneDistanceMap
+) {
+  const eligibleZones = zones.filter((zone) => zone.status === "ACTIVE" && subtotal >= zone.minimumOrderValue);
+  const district = normalizeZoneText(address.district);
+  const neighborhoodZone = eligibleZones.find(
+    (zone) => zone.type === "NEIGHBORHOOD" && normalizeZoneText(zone.neighborhood ?? "") === district
+  );
+
+  if (neighborhoodZone) return neighborhoodZone;
+
+  const cep = Number(onlyDigits(address.postalCode));
+  const postalCodeZone = eligibleZones.find((zone) => {
+    if (zone.type !== "POSTAL_CODE") return false;
+
+    const start = Number(onlyDigits(zone.postalCodeStart ?? ""));
+    const end = Number(onlyDigits(zone.postalCodeEnd ?? ""));
+    return Boolean(cep && start && end && cep >= start && cep <= end);
+  });
+
+  if (postalCodeZone) return postalCodeZone;
+
+  const radiusZones = eligibleZones
+    .filter((zone) => zone.type === "RADIUS")
+    .filter((zone) => {
+      const distance = zoneDistances[zone.id];
+      return distance !== undefined && zone.radiusKm !== undefined && distance <= zone.radiusKm;
+    })
+    .sort((a, b) => (a.radiusKm ?? 9999) - (b.radiusKm ?? 9999));
+
+  if (radiusZones[0]) return radiusZones[0];
+
+  const largestRadiusKm = eligibleZones
+    .filter((zone) => zone.type === "RADIUS")
+    .reduce((largest, zone) => Math.max(largest, zone.radiusKm ?? 0), 0);
+
+  return eligibleZones
+    .filter((zone) => zone.type === "RADIUS_OVERFLOW")
+    .filter((zone) => {
+      const distance = zoneDistances[zone.id];
+      return distance !== undefined && distance > largestRadiusKm;
+    })
+    .sort((a, b) => (zoneDistances[a.id] ?? 9999) - (zoneDistances[b.id] ?? 9999))[0];
 }
 
 export function CustomerCart({ step }: { step: CheckoutStep }) {
@@ -65,6 +167,8 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
   const [cepLookupError, setCepLookupError] = useState<string | null>(null);
   const lastCepLookupRef = useRef("");
   const [cartItemPendingDelete, setCartItemPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [zoneDistances, setZoneDistances] = useState<ZoneDistanceMap>({});
+  const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
   const { data: deliveryZones = [] } = useQuery({
     queryKey: ["public-delivery-zones", tenantSlug],
     queryFn: () => deliveryZonesService.listPublic(tenantSlug),
@@ -78,8 +182,8 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
 
   const paymentLabel = payment.type === "PIX" ? "PIX" : payment.type === "CREDIT_CARD" ? "Cartao de credito" : "Dinheiro";
   const selectedZone = useMemo(
-    () => findDeliveryZone(deliveryZones, address.postalCode, subtotal),
-    [address.postalCode, deliveryZones, subtotal]
+    () => findDeliveryZone(deliveryZones, address, subtotal, zoneDistances),
+    [address, deliveryZones, subtotal, zoneDistances]
   );
   const pageTitle =
     step === "cart" ? "Revise seu pedido" : step === "address" ? "Endereco de entrega" : step === "payment" ? "Pagamento" : "Pedido confirmado";
@@ -145,6 +249,61 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
   }, [address.postalCode, updateAddress]);
 
   useEffect(() => {
+    const radiusZones = deliveryZones.filter(
+      (zone) => (zone.type === "RADIUS" || zone.type === "RADIUS_OVERFLOW") && zone.status === "ACTIVE" && zone.branch?.address
+    );
+    const hasCustomerAddress = Boolean(address.street && address.number && address.district && address.city && address.state);
+
+    if (fulfillment.type !== "DELIVERY" || radiusZones.length === 0 || !hasCustomerAddress) {
+      setZoneDistances({});
+      setIsCalculatingDistance(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setIsCalculatingDistance(true);
+
+    void (async () => {
+      try {
+        const customerPoint = await geocodeAddress(addressToQuery(address), controller.signal);
+
+        if (!customerPoint) {
+          setZoneDistances({});
+          return;
+        }
+
+        const nextDistances: ZoneDistanceMap = {};
+
+        for (const zone of radiusZones) {
+          const branchAddress = zone.branch?.address;
+          if (!branchAddress) continue;
+
+          const branchPoint =
+            branchAddress.latitude !== undefined && branchAddress.longitude !== undefined
+              ? { lat: Number(branchAddress.latitude), lng: Number(branchAddress.longitude) }
+              : await geocodeAddress(addressToQuery(branchAddress), controller.signal);
+
+          if (branchPoint) {
+            nextDistances[zone.id] = Number(distanceInKm(branchPoint, customerPoint).toFixed(2));
+          }
+        }
+
+        setZoneDistances(nextDistances);
+      } catch (distanceError) {
+        if ((distanceError as Error).name !== "AbortError") {
+          setZoneDistances({});
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsCalculatingDistance(false);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [address, deliveryZones, fulfillment.type]);
+
+  useEffect(() => {
     if (fulfillment.type === "PICKUP") {
       if (fulfillment.deliveryFee !== 0) {
         updateFulfillment({ deliveryFee: 0, zoneId: undefined, zoneName: undefined, estimatedMinutes: undefined });
@@ -168,10 +327,10 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       return;
     }
 
-    if (onlyDigits(address.postalCode).length >= 8 && (fulfillment.deliveryFee !== 0 || fulfillment.zoneId)) {
+    if ((address.district || onlyDigits(address.postalCode).length >= 8) && (fulfillment.deliveryFee !== 0 || fulfillment.zoneId)) {
       updateFulfillment({ deliveryFee: 0, zoneId: undefined, zoneName: undefined, estimatedMinutes: undefined });
     }
-  }, [address.postalCode, fulfillment.deliveryFee, fulfillment.estimatedMinutes, fulfillment.type, fulfillment.zoneId, selectedZone, updateFulfillment]);
+  }, [address.district, address.postalCode, fulfillment.deliveryFee, fulfillment.estimatedMinutes, fulfillment.type, fulfillment.zoneId, selectedZone, updateFulfillment]);
 
   const nextStep = () => {
     setError(null);
@@ -200,9 +359,15 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
         return;
       }
 
-      if (fulfillment.type === "DELIVERY" && onlyDigits(address.postalCode).length >= 8 && deliveryZones.length > 0 && !selectedZone) {
-        setError("Este CEP ainda nao esta dentro de uma area de entrega ativa.");
-        toast.warning("Este CEP ainda nao esta dentro de uma area de entrega ativa.");
+      if (fulfillment.type === "DELIVERY" && isCalculatingDistance) {
+        setError("Aguarde o calculo automatico da entrega.");
+        toast.info("Calculando a distancia da loja.");
+        return;
+      }
+
+      if (fulfillment.type === "DELIVERY" && deliveryZones.length > 0 && !selectedZone) {
+        setError("Este endereco ainda nao esta dentro de uma area de entrega ativa.");
+        toast.warning("Este endereco ainda nao esta dentro de uma area de entrega ativa.");
         return;
       }
 
@@ -235,9 +400,16 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       return;
     }
 
-    if (fulfillment.type === "DELIVERY" && onlyDigits(address.postalCode).length >= 8 && deliveryZones.length > 0 && !selectedZone) {
-      setError("Este CEP ainda nao esta dentro de uma area de entrega ativa.");
-      toast.warning("Este CEP ainda nao esta dentro de uma area de entrega ativa.");
+    if (fulfillment.type === "DELIVERY" && isCalculatingDistance) {
+      setError("Aguarde o calculo automatico da entrega.");
+      toast.info("Calculando a distancia da loja.");
+      navigate(tenantPath("/carrinho/endereco"));
+      return;
+    }
+
+    if (fulfillment.type === "DELIVERY" && deliveryZones.length > 0 && !selectedZone) {
+      setError("Este endereco ainda nao esta dentro de uma area de entrega ativa.");
+      toast.warning("Este endereco ainda nao esta dentro de uma area de entrega ativa.");
       navigate(tenantPath("/carrinho/endereco"));
       return;
     }
@@ -456,7 +628,15 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                     </div>
                     {isLookingUpCep ? <small className="field-hint">Buscando endereco...</small> : null}
                     {cepLookupError ? <small className="field-hint field-hint-error">{cepLookupError}</small> : null}
-                    {selectedZone ? <small className="field-hint">Area {selectedZone.name}: {formatCurrency(selectedZone.fee)}</small> : null}
+                    {isCalculatingDistance ? <small className="field-hint">Calculando distancia da loja...</small> : null}
+                    {selectedZone ? (
+                      <small className="field-hint">
+                        Area {selectedZone.name}: {formatCurrency(selectedZone.fee)}
+                        {(selectedZone.type === "RADIUS" || selectedZone.type === "RADIUS_OVERFLOW") && zoneDistances[selectedZone.id] !== undefined
+                          ? ` - ${zoneDistances[selectedZone.id].toFixed(2).replace(".", ",")} km da loja`
+                          : ""}
+                      </small>
+                    ) : null}
                   </label>
                   <label className="field">
                     <span>Rua</span>

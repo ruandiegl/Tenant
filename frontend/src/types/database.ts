@@ -125,7 +125,8 @@ export type DeliveryZone = BaseEntity & {
   tenantId: string;
   branchId: string;
   name: string;
-  type: "POSTAL_CODE" | "RADIUS";
+  type: "NEIGHBORHOOD" | "POSTAL_CODE" | "RADIUS" | "RADIUS_OVERFLOW";
+  neighborhood?: string;
   postalCodeStart?: string;
   postalCodeEnd?: string;
   radiusKm?: number;
@@ -147,6 +148,8 @@ export type Address = BaseEntity & {
   state: string;
   postalCode: string;
   country: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
   reference?: string;
 };
 

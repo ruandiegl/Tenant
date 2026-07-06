@@ -24,3 +24,12 @@ export const update: RequestHandler = async (req, res, next) => {
     return next(error);
   }
 };
+
+export const remove: RequestHandler = async (req, res, next) => {
+  try {
+    await service.deleteBranch(req.tenantId!, req.params.id);
+    return res.status(204).send();
+  } catch (error) {
+    return next(error);
+  }
+};

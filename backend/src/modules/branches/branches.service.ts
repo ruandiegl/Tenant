@@ -18,6 +18,8 @@ type BranchInput = {
     city: string;
     state: string;
     postalCode: string;
+    latitude?: number;
+    longitude?: number;
     reference?: string;
   };
 };
@@ -30,6 +32,7 @@ export const createBranch = (tenantId: string, data: BranchInput) => {
       slug: data.slug,
       email: data.email,
       phone: data.phone,
+      status: data.status,
       acceptsDelivery: data.acceptsDelivery ?? true,
       acceptsPickup: data.acceptsPickup ?? true,
       acceptsDineIn: data.acceptsDineIn ?? false,
@@ -70,6 +73,23 @@ export const updateBranch = async (tenantId: string, id: string, data: Partial<B
           ? { update: data.address }
           : { create: { tenantId, ...data.address } }
         : undefined
+    },
+    include: { address: true }
+  });
+};
+
+export const deleteBranch = async (tenantId: string, id: string) => {
+  const branch = await prisma.branch.findFirst({ where: { id, tenantId, deletedAt: null } });
+
+  if (!branch) {
+    throw new AppError("Branch not found", 404);
+  }
+
+  return prisma.branch.update({
+    where: { id },
+    data: {
+      status: "INACTIVE",
+      deletedAt: new Date()
     },
     include: { address: true }
   });

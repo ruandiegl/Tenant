@@ -148,8 +148,10 @@ enum KitchenTicketPriority {
 }
 
 enum DeliveryZoneType {
+  NEIGHBORHOOD
   POSTAL_CODE
   RADIUS
+  RADIUS_OVERFLOW
 }
 
 enum NoteVisibility {
@@ -407,6 +409,7 @@ model DeliveryZone {
   branch            Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
   name              String
   type              DeliveryZoneType
+  neighborhood      String?
   postalCodeStart   String?
   postalCodeEnd     String?
   radiusKm          Decimal?         @db.Decimal(8, 2)

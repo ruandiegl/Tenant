@@ -6,6 +6,7 @@ const labels: Record<string, string> = {
   TRIAL: "Trial",
   SUSPENDED: "Suspenso",
   INACTIVE: "Inativo",
+  CLOSED_TEMPORARILY: "Fechado",
   OUT_OF_STOCK: "Esgotado",
   ARCHIVED: "Arquivado",
   PLACED: "Novo",

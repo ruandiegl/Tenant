@@ -4,6 +4,7 @@ import { AdminLayout } from "../app/layouts/admin-layout";
 import { SuperAdminLayout } from "../app/layouts/superadmin-layout";
 import { ProtectedRoute } from "./protected-route";
 import { AdminDashboard } from "../pages/admin/dashboard";
+import { AdminBranches } from "../pages/admin/branches";
 import { AdminDeliveries } from "../pages/admin/deliveries";
 import { AdminOrders } from "../pages/admin/orders";
 import { AdminMenu } from "../pages/admin/menu";
@@ -119,6 +120,16 @@ function RouteShell() {
               <ProtectedRoute permission="tenant.branches.read">
                 <AdminLayout>
                   <AdminDeliveries />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/entregas/filiais"
+            element={
+              <ProtectedRoute permission="tenant.branches.read">
+                <AdminLayout>
+                  <AdminBranches />
                 </AdminLayout>
               </ProtectedRoute>
             }

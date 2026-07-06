@@ -1,5 +1,6 @@
 import { Branch, Coupon, DeliveryZone, ReportSummary } from "../types/database";
 import { protectedApi } from "./api";
+import { branchesService } from "./branches";
 import { deliveryZonesService } from "./delivery-zones";
 
 type BackendSummary = {
@@ -86,7 +87,7 @@ export const adminService = {
   },
   getTenantAdminBundle: async () => {
     const [branches, coupons, deliveryZones] = await Promise.all([
-      protectedApi<Branch[]>("/tenant/branches"),
+      branchesService.list(),
       protectedApi<Coupon[]>("/tenant/coupons"),
       deliveryZonesService.list()
     ]);

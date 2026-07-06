@@ -5,7 +5,8 @@ import { AppError } from "../../shared/errors/app-error.js";
 type DeliveryZoneInput = {
   branchId: string;
   name: string;
-  type: "POSTAL_CODE" | "RADIUS";
+  type: "NEIGHBORHOOD" | "POSTAL_CODE" | "RADIUS" | "RADIUS_OVERFLOW";
+  neighborhood?: string;
   postalCodeStart?: string;
   postalCodeEnd?: string;
   radiusKm?: number;
@@ -34,6 +35,7 @@ function toDeliveryZoneData(data: DeliveryZoneInput) {
     branchId: data.branchId,
     name: data.name,
     type: data.type,
+    neighborhood: data.type === "NEIGHBORHOOD" ? data.neighborhood?.trim() : null,
     postalCodeStart: data.type === "POSTAL_CODE" ? data.postalCodeStart : null,
     postalCodeEnd: data.type === "POSTAL_CODE" ? data.postalCodeEnd : null,
     radiusKm: data.type === "RADIUS" && data.radiusKm !== undefined ? new Prisma.Decimal(data.radiusKm) : null,

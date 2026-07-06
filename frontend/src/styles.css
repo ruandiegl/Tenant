@@ -233,6 +233,18 @@ img {
   width: 100%;
 }
 
+.field input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.field input[type="number"]::-webkit-inner-spin-button,
+.field input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .field div > input:only-child,
 .field div > select:only-child,
 .field div > textarea:only-child {

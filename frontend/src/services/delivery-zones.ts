@@ -10,7 +10,8 @@ type BackendDeliveryZone = Omit<DeliveryZone, "fee" | "minimumOrderValue" | "rad
 export type DeliveryZonePayload = {
   branchId: string;
   name: string;
-  type: "POSTAL_CODE" | "RADIUS";
+  type: "NEIGHBORHOOD" | "POSTAL_CODE" | "RADIUS" | "RADIUS_OVERFLOW";
+  neighborhood?: string;
   postalCodeStart?: string;
   postalCodeEnd?: string;
   radiusKm?: number;
@@ -23,6 +24,7 @@ export type DeliveryZonePayload = {
 function mapDeliveryZone(zone: BackendDeliveryZone): DeliveryZone {
   return {
     ...zone,
+    neighborhood: zone.neighborhood ?? undefined,
     postalCodeStart: zone.postalCodeStart ?? undefined,
     postalCodeEnd: zone.postalCodeEnd ?? undefined,
     radiusKm: zone.radiusKm === null || zone.radiusKm === undefined ? undefined : Number(zone.radiusKm),
