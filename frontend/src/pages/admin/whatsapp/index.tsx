@@ -178,7 +178,7 @@ export function AdminWhatsapp() {
         eyebrow="Atendimento"
         title="WhatsApp"
         description="Conecte o numero do restaurante para respostas automaticas e avisos de pedido."
-        actions={whatsappConnected ? <span className="connection">Conectado</span> : <span className="connection">Aguardando conexao</span>}
+        actions={whatsappConnected ? <span className="connection">Conectado</span> : null}
       />
 
       <div className="whatsapp-grid">
@@ -200,6 +200,9 @@ export function AdminWhatsapp() {
           </div>
 
           {whatsappSession?.lastError && <p className="form-error">{whatsappSession.lastError}</p>}
+          {whatsappSession?.status === "PENDING_QR" && !whatsappSession.lastError ? (
+            <p className="muted-text">Aguardando leitura ou atualizacao do QR Code.</p>
+          ) : null}
 
           {whatsappSession?.qrCode ? (
             <div className="whatsapp-qr">

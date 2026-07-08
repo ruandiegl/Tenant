@@ -43,7 +43,24 @@ export const updateSettings: RequestHandler = async (req, res, next) => {
 
 export const sendTestMessage: RequestHandler = async (req, res, next) => {
   try {
-    return res.json(await service.sendTextMessage(req.tenantId!, req.body.phone, req.body.message));
+    return res.json(await service.sendTextMessage(req.tenantId!, req.body.phone, req.body.message, { source: "test" }));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getHealth: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.getWahaConnectivityHealth(req.tenantId!));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const deleteMessage: RequestHandler = async (req, res, next) => {
+  try {
+    await service.deleteMessage(req.tenantId!, req.params.id);
+    return res.status(204).send();
   } catch (error) {
     return next(error);
   }

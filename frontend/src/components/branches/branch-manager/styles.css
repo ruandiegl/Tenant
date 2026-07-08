@@ -87,6 +87,18 @@
   width: 38px;
 }
 
+.branch-modal-actions {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(150px, 0.85fr) minmax(180px, 1.15fr);
+}
+
+.branch-modal-actions button {
+  justify-content: center;
+  min-height: 46px;
+  width: 100%;
+}
+
 @media (max-width: 520px) {
   .branch-card {
     grid-template-columns: 1fr auto;
@@ -95,5 +107,9 @@
   .branch-card .status-badge,
   .branch-card button {
     justify-self: start;
+  }
+
+  .branch-modal-actions {
+    grid-template-columns: 1fr 1fr;
   }
 }

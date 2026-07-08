@@ -191,6 +191,116 @@
   font-weight: 850;
 }
 
+.real-map-preview {
+  min-height: 280px;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+}
+
+.static-radius-map {
+  background: #d8e7dd;
+  inset: 0;
+  overflow: hidden;
+  position: absolute;
+  user-select: none;
+}
+
+.static-radius-map iframe,
+.real-map-preview iframe {
+  border: 0;
+  filter: saturate(0.95) contrast(0.98);
+  height: 100%;
+  inset: 0;
+  min-height: 280px;
+  pointer-events: none;
+  position: absolute;
+  user-select: none;
+  width: 100%;
+  z-index: 1;
+}
+
+.real-map-radius {
+  background: rgba(30, 107, 60, 0.16);
+  border: 2px solid rgba(30, 107, 60, 0.82);
+  border-radius: 999px;
+  box-shadow: 0 0 0 999px rgba(11, 24, 18, 0.06);
+  height: var(--radius-diameter);
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--radius-diameter);
+  z-index: 2;
+}
+
+.real-map-branch-point {
+  background: var(--brand);
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(13, 31, 27, 0.24);
+  height: 18px;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px;
+  z-index: 3;
+}
+
+.real-map-caption {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(200, 221, 209, 0.92);
+  border-radius: 8px;
+  bottom: 12px;
+  box-shadow: 0 10px 30px rgba(13, 31, 27, 0.14);
+  color: var(--brand-dark);
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 850;
+  left: 12px;
+  min-height: 34px;
+  padding: 0 12px;
+  position: absolute;
+  z-index: 4;
+}
+
+.real-map-note {
+  align-items: center;
+  background: rgba(18, 41, 30, 0.9);
+  border-radius: 8px;
+  color: white;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 800;
+  min-height: 28px;
+  padding: 0 9px;
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 4;
+}
+
+.map-empty-state {
+  align-items: center;
+  color: var(--brand-dark);
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 22px;
+  position: relative;
+  z-index: 1;
+}
+
+.map-empty-state span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  max-width: 260px;
+}
+
 .delivery-zone-list-panel {
   grid-column: 1 / -1;
 }

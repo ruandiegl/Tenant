@@ -154,6 +154,11 @@ enum DeliveryZoneType {
   RADIUS_OVERFLOW
 }
 
+enum DeliveryDistanceMode {
+  ROUTE
+  STRAIGHT_LINE
+}
+
 enum NoteVisibility {
   INTERNAL
   CUSTOMER
@@ -413,6 +418,7 @@ model DeliveryZone {
   postalCodeStart   String?
   postalCodeEnd     String?
   radiusKm          Decimal?         @db.Decimal(8, 2)
+  distanceMode      DeliveryDistanceMode @default(ROUTE)
   fee               Decimal          @default(0) @db.Decimal(12, 2)
   minimumOrderValue Decimal          @default(0) @db.Decimal(12, 2)
   estimatedMinutes  Int?
@@ -1010,12 +1016,13 @@ model WhatsappMessage {
   to             String?
   body           String?                  @db.Text
   messageType    String?
-  rawPayload     Json?
-  sentAt         DateTime?
-  receivedAt     DateTime?
-  createdAt      DateTime                 @default(now())
-
-  @@unique([sessionId, externalId])
+    rawPayload     Json?
+    sentAt         DateTime?
+    receivedAt     DateTime?
+    deletedAt      DateTime?
+    createdAt      DateTime                 @default(now())
+  
+    @@unique([sessionId, externalId])
   @@index([tenantId, chatId, createdAt])
   @@index([conversationId, createdAt])
 }

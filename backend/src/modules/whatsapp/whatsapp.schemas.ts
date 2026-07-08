@@ -15,6 +15,12 @@ export const whatsappTestMessageSchema = z.object({
   })
 });
 
+export const whatsappMessageDeleteSchema = z.object({
+  params: z.object({
+    id: z.string().min(1)
+  })
+});
+
 export const whatsappTemplateUpdateSchema = z.object({
   params: z.object({
     id: z.string().min(1)

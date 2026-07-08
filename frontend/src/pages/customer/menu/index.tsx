@@ -33,18 +33,6 @@ export function CustomerMenu() {
     document.getElementById(`customer-category-${categoryId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleAddProduct = (product: Product) => {
-    if (product.optionGroups.some((group) => group.items.length > 0)) {
-      setSelectedOptions({});
-      setCustomizationNotes("");
-      setCustomizingProduct(product);
-      return;
-    }
-
-    addProduct(product, []);
-    toast.success(`${product.name} adicionado ao carrinho.`);
-  };
-
   const toggleOption = (option: { id: string; name: string; price: number }) => {
     setSelectedOptions((current) => {
       if (current[option.id]) {
@@ -117,7 +105,7 @@ export function CustomerMenu() {
         <h2>Destaques</h2>
         <div className="product-grid">
           {featured.map((product) => (
-            <ProductCard key={product.id} product={product} stockQuantity={getProductStock(product.id)} onAdd={handleAddProduct} />
+            <ProductCard key={product.id} product={product} stockQuantity={getProductStock(product.id)} />
           ))}
         </div>
       </section>
@@ -133,7 +121,7 @@ export function CustomerMenu() {
               </div>
               <div className="product-grid">
                 {category.products.map((product) => (
-                  <ProductCard key={product.id} product={product} stockQuantity={getProductStock(product.id)} onAdd={handleAddProduct} />
+                  <ProductCard key={product.id} product={product} stockQuantity={getProductStock(product.id)} />
                 ))}
               </div>
             </section>

@@ -9,6 +9,7 @@ const deliveryZoneBodySchema = z
     postalCodeStart: z.string().optional(),
     postalCodeEnd: z.string().optional(),
     radiusKm: z.number().nonnegative().optional(),
+    distanceMode: z.enum(["ROUTE", "STRAIGHT_LINE"]).default("ROUTE"),
     fee: z.number().nonnegative(),
     minimumOrderValue: z.number().nonnegative().default(0),
     estimatedMinutes: z.number().int().positive().optional(),

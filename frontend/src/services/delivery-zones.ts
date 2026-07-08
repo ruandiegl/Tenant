@@ -15,6 +15,7 @@ export type DeliveryZonePayload = {
   postalCodeStart?: string;
   postalCodeEnd?: string;
   radiusKm?: number;
+  distanceMode?: "ROUTE" | "STRAIGHT_LINE";
   fee: number;
   minimumOrderValue: number;
   estimatedMinutes?: number;
@@ -28,6 +29,7 @@ function mapDeliveryZone(zone: BackendDeliveryZone): DeliveryZone {
     postalCodeStart: zone.postalCodeStart ?? undefined,
     postalCodeEnd: zone.postalCodeEnd ?? undefined,
     radiusKm: zone.radiusKm === null || zone.radiusKm === undefined ? undefined : Number(zone.radiusKm),
+    distanceMode: zone.distanceMode ?? "ROUTE",
     fee: Number(zone.fee),
     minimumOrderValue: Number(zone.minimumOrderValue),
     estimatedMinutes: zone.estimatedMinutes ?? undefined

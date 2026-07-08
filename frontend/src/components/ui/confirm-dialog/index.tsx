@@ -1,5 +1,6 @@
 import { Loader2, LogOut, Trash2, X } from "lucide-react";
 import "./styles.css";
+import { useBodyScrollLock } from "../../../hooks/use-body-scroll-lock";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -24,6 +25,8 @@ export function ConfirmDialog({
   onCancel,
   onConfirm
 }: ConfirmDialogProps) {
+  useBodyScrollLock(open);
+
   if (!open) return null;
   const Icon = tone === "neutral" ? LogOut : Trash2;
 

@@ -16,6 +16,8 @@ const envSchema = z.object({
   WAHA_BASE_URL: z.string().url().default("http://localhost:3000"),
   WAHA_API_KEY: z.string().optional(),
   WAHA_WEBHOOK_SECRET: z.string().optional(),
+  WAHA_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(15_000),
+  WHATSAPP_AUTO_REPLY_DELAY_MS: z.coerce.number().int().min(0).max(10_000).default(2_000),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().default(120)
 });

@@ -130,6 +130,7 @@ export type DeliveryZone = BaseEntity & {
   postalCodeStart?: string;
   postalCodeEnd?: string;
   radiusKm?: number;
+  distanceMode?: "ROUTE" | "STRAIGHT_LINE";
   fee: number;
   minimumOrderValue: number;
   estimatedMinutes?: number;

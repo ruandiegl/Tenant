@@ -29,6 +29,10 @@ export const whatsappService = {
       method: "POST",
       body: JSON.stringify(payload)
     }),
+  deleteMessage: (id: string) =>
+    protectedApi<void>(`/tenant/whatsapp/messages/${id}`, {
+      method: "DELETE"
+    }),
   listTemplates: () => protectedApi<WhatsappMessageTemplate[]>("/tenant/whatsapp/templates"),
   updateTemplate: (id: string, payload: { title?: string; body?: string; enabled?: boolean }) =>
     protectedApi<WhatsappMessageTemplate>(`/tenant/whatsapp/templates/${id}`, {

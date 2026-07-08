@@ -10,6 +10,7 @@ type DeliveryZoneInput = {
   postalCodeStart?: string;
   postalCodeEnd?: string;
   radiusKm?: number;
+  distanceMode?: "ROUTE" | "STRAIGHT_LINE";
   fee: number;
   minimumOrderValue?: number;
   estimatedMinutes?: number;
@@ -39,6 +40,7 @@ function toDeliveryZoneData(data: DeliveryZoneInput) {
     postalCodeStart: data.type === "POSTAL_CODE" ? data.postalCodeStart : null,
     postalCodeEnd: data.type === "POSTAL_CODE" ? data.postalCodeEnd : null,
     radiusKm: data.type === "RADIUS" && data.radiusKm !== undefined ? new Prisma.Decimal(data.radiusKm) : null,
+    distanceMode: data.type === "RADIUS" || data.type === "RADIUS_OVERFLOW" ? data.distanceMode ?? "ROUTE" : "ROUTE",
     fee: new Prisma.Decimal(data.fee),
     minimumOrderValue: new Prisma.Decimal(data.minimumOrderValue ?? 0),
     estimatedMinutes: data.estimatedMinutes,

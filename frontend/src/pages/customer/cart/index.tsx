@@ -19,6 +19,7 @@ type GeoPoint = { lat: number; lng: number };
 type ZoneDistanceMap = Record<string, number>;
 
 const geocodeCache = new Map<string, GeoPoint | null>();
+const routeDistanceCache = new Map<string, number | null>();
 
 function normalizeZoneText(value: string) {
   return value
@@ -26,6 +27,10 @@ function normalizeZoneText(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function deliveryDistanceLabel(zone: DeliveryZone) {
+  return (zone.distanceMode ?? "ROUTE") === "STRAIGHT_LINE" ? "em linha reta" : "de trajeto";
 }
 
 function toRadians(value: number) {
@@ -43,6 +48,45 @@ function distanceInKm(origin: GeoPoint, destination: GeoPoint) {
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
 
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function routeCacheKey(origin: GeoPoint, destination: GeoPoint) {
+  return [
+    origin.lng.toFixed(6),
+    origin.lat.toFixed(6),
+    destination.lng.toFixed(6),
+    destination.lat.toFixed(6)
+  ].join(",");
+}
+
+async function routeDistanceInKm(origin: GeoPoint, destination: GeoPoint, signal?: AbortSignal) {
+  const key = routeCacheKey(origin, destination);
+  const cached = routeDistanceCache.get(key);
+
+  if (cached !== undefined) return cached;
+
+  const coordinates = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
+  const params = new URLSearchParams({
+    alternatives: "false",
+    overview: "false",
+    steps: "false"
+  });
+  const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?${params.toString()}`, {
+    signal,
+    headers: { Accept: "application/json" }
+  });
+
+  if (!response.ok) {
+    routeDistanceCache.set(key, null);
+    return null;
+  }
+
+  const result = (await response.json()) as { code?: string; routes?: Array<{ distance?: number }> };
+  const distanceMeters = result.code === "Ok" ? result.routes?.[0]?.distance : undefined;
+  const distanceKm = typeof distanceMeters === "number" ? distanceMeters / 1000 : null;
+
+  routeDistanceCache.set(key, distanceKm);
+  return distanceKm;
 }
 
 function addressToQuery(address: {
@@ -121,14 +165,15 @@ function findDeliveryZone(
 
   if (radiusZones[0]) return radiusZones[0];
 
-  const largestRadiusKm = eligibleZones
-    .filter((zone) => zone.type === "RADIUS")
-    .reduce((largest, zone) => Math.max(largest, zone.radiusKm ?? 0), 0);
-
   return eligibleZones
     .filter((zone) => zone.type === "RADIUS_OVERFLOW")
     .filter((zone) => {
       const distance = zoneDistances[zone.id];
+      const mode = zone.distanceMode ?? "ROUTE";
+      const largestRadiusKm = eligibleZones
+        .filter((radiusZone) => radiusZone.type === "RADIUS" && (radiusZone.distanceMode ?? "ROUTE") === mode)
+        .reduce((largest, radiusZone) => Math.max(largest, radiusZone.radiusKm ?? 0), 0);
+
       return distance !== undefined && distance > largestRadiusKm;
     })
     .sort((a, b) => (zoneDistances[a.id] ?? 9999) - (zoneDistances[b.id] ?? 9999))[0];
@@ -279,12 +324,21 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
           if (!branchAddress) continue;
 
           const branchPoint =
-            branchAddress.latitude !== undefined && branchAddress.longitude !== undefined
+            branchAddress.latitude !== undefined &&
+            branchAddress.longitude !== undefined &&
+            branchAddress.latitude !== null &&
+            branchAddress.longitude !== null
               ? { lat: Number(branchAddress.latitude), lng: Number(branchAddress.longitude) }
               : await geocodeAddress(addressToQuery(branchAddress), controller.signal);
 
           if (branchPoint) {
-            nextDistances[zone.id] = Number(distanceInKm(branchPoint, customerPoint).toFixed(2));
+            const straightLineDistance = distanceInKm(branchPoint, customerPoint);
+            const routeDistance =
+              (zone.distanceMode ?? "ROUTE") === "STRAIGHT_LINE"
+                ? null
+                : await routeDistanceInKm(branchPoint, customerPoint, controller.signal);
+            const deliveryDistance = routeDistance ?? straightLineDistance;
+            nextDistances[zone.id] = Number(deliveryDistance.toFixed(2));
           }
         }
 
@@ -633,7 +687,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                       <small className="field-hint">
                         Area {selectedZone.name}: {formatCurrency(selectedZone.fee)}
                         {(selectedZone.type === "RADIUS" || selectedZone.type === "RADIUS_OVERFLOW") && zoneDistances[selectedZone.id] !== undefined
-                          ? ` - ${zoneDistances[selectedZone.id].toFixed(2).replace(".", ",")} km da loja`
+                          ? ` - ${zoneDistances[selectedZone.id].toFixed(2).replace(".", ",")} km ${deliveryDistanceLabel(selectedZone)}`
                           : ""}
                       </small>
                     ) : null}

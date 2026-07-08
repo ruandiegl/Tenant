@@ -10,6 +10,7 @@ import { ProductCard } from "../../../components/menu/product-card";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { PageHeader } from "../../../components/ui/page-header";
 import { StatusBadge } from "../../../components/ui/status-badge";
+import { useBodyScrollLock } from "../../../hooks/use-body-scroll-lock";
 import { MenuCategory, Product, ProductStatus, ProductTemplate } from "../../../types/database";
 import { menuService } from "../../../services/menu";
 import { formatCurrency } from "../../../utils/format";
@@ -118,6 +119,7 @@ export function AdminMenu() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  useBodyScrollLock(categoryModalOpen || productModalOpen || templateModalOpen);
   const [ingredientInput, setIngredientInput] = useState("");
   const [complementInput, setComplementInput] = useState({ name: "", price: "" });
   const [templateDraft, setTemplateDraft] = useState(emptyTemplateDraft);
@@ -645,8 +647,8 @@ export function AdminMenu() {
       </section>
 
       {categoryModalOpen ? (
-        <div className="modal-backdrop" role="presentation">
-          <form className="modal-card" onSubmit={handleCategorySubmit} role="dialog" aria-modal="true" aria-label="Cadastro de categoria">
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeCategoryModal}>
+          <form className="modal-card" onMouseDown={(event) => event.stopPropagation()} onSubmit={handleCategorySubmit} role="dialog" aria-modal="true" aria-label="Cadastro de categoria">
             <div className="modal-header">
               <div>
                 <span className="eyebrow">Categoria</span>
@@ -703,9 +705,10 @@ export function AdminMenu() {
       ) : null}
 
       {templateModalOpen ? (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeTemplateModal}>
           <form
             className="modal-card product-modal"
+            onMouseDown={(event) => event.stopPropagation()}
             onSubmit={(event) => {
               event.preventDefault();
               void saveTemplateFromDraft();
@@ -785,8 +788,8 @@ export function AdminMenu() {
       ) : null}
 
       {productModalOpen ? (
-        <div className="modal-backdrop" role="presentation">
-          <form className="modal-card product-modal" onSubmit={handleProductSubmit} role="dialog" aria-modal="true" aria-label="Cadastro de produto">
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeProductModal}>
+          <form className="modal-card product-modal" onMouseDown={(event) => event.stopPropagation()} onSubmit={handleProductSubmit} role="dialog" aria-modal="true" aria-label="Cadastro de produto">
             <div className="modal-header">
               <div>
                 <span className="eyebrow">Produto</span>

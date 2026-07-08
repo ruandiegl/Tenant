@@ -2,8 +2,9 @@ import { OrderStatus, Prisma, WhatsappSessionStatus, WhatsappTemplateTrigger } f
 import crypto from "node:crypto";
 import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
+import { getSocketServer } from "../../config/socket.js";
 import { AppError } from "../../shared/errors/app-error.js";
-import { wahaQrRequest, wahaRequest } from "./waha.client.js";
+import { wahaBaseUrl, wahaQrRequest, wahaRequest, wahaRequestWithMeta } from "./waha.client.js";
 
 type WahaWebhookBody = {
   event?: string;
@@ -32,8 +33,13 @@ type TemplateUpdateInput = {
 
 type TemplateVariables = Record<string, string | number | null | undefined>;
 
+type SendTextMessageOptions = {
+  source?: "test" | "auto_reply" | "order_status" | "manual";
+};
+
 const SESSION_PREFIX = "podepedir";
 const AUTO_REPLY_COOLDOWN_MS = 2 * 60_000;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_TEMPLATES: Array<{
   trigger: WhatsappTemplateTrigger;
@@ -139,14 +145,77 @@ const defaultWelcomeMessage = (tenant: { name: string; slug: string; settings: {
   tenant.settings?.welcomeMessage ||
   `Ola! Voce esta falando com ${tenant.settings?.brandName ?? tenant.name}. Para fazer seu pedido, acesse ${publicMenuUrl(tenant.slug)}.`;
 
+const getSerializedId = (value: unknown): string | undefined => {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return undefined;
+
+  const record = value as Record<string, unknown>;
+  return asString(record._serialized) ?? asString(record.id) ?? asString(record.remote);
+};
+
 const getExternalId = (payload: Record<string, unknown>) => {
   const id = payload.id;
 
-  if (typeof id === "string") return id;
-  if (id && typeof id === "object" && "_serialized" in id) return asString((id as Record<string, unknown>)._serialized);
+  const direct =
+    getSerializedId(id) ??
+    asString(payload.messageId) ??
+    asString(payload.externalId) ??
+    getSerializedId((payload._data as Record<string, unknown> | undefined)?.id) ??
+    getSerializedId((payload.message as Record<string, unknown> | undefined)?.id);
+
+  if (direct) return direct;
 
   return undefined;
 };
+
+const getStableMessageId = (sessionName: string, payload: Record<string, unknown>) => {
+  const externalId = getExternalId(payload);
+
+  if (externalId) return externalId;
+
+  const stablePayload = {
+    sessionName,
+    chatId: asString(payload.chatId) ?? asString(payload.from) ?? asString(payload.to),
+    from: asString(payload.from),
+    to: asString(payload.to),
+    fromMe: Boolean(payload.fromMe),
+    timestamp: payload.timestamp,
+    type: asString(payload.type),
+    body: asString(payload.body) ?? asString(payload.text)
+  };
+
+  return `hash:${crypto.createHash("sha256").update(JSON.stringify(stablePayload)).digest("hex")}`;
+};
+
+const getPayloadQrCode = (payload: Record<string, unknown>) =>
+  asString(payload.qr) ?? asString(payload.qrCode) ?? asString(payload.image);
+
+const logWhatsapp = (level: "info" | "warn" | "error", message: string, meta: Record<string, unknown> = {}) => {
+  const safeMeta = {
+    ...meta,
+    body: undefined,
+    text: undefined,
+    token: undefined,
+    secret: undefined
+  };
+
+  console[level](`[whatsapp] ${message}`, safeMeta);
+};
+
+const maskIdentifier = (value: string) => {
+  const [id, suffix] = value.split("@");
+  const visible = id.slice(-4);
+  const masked = `${"*".repeat(Math.max(id.length - visible.length, 0))}${visible}`;
+
+  return suffix ? `${masked}@${suffix}` : masked;
+};
+
+const getErrorDetails = (error: unknown) =>
+  error instanceof AppError && error.details && typeof error.details === "object"
+    ? (error.details as Record<string, unknown>)
+    : {};
+
+const getWahaErrorMessage = (error: unknown) => (error instanceof Error ? error.message : "WhatsApp send failed");
 
 const timingSafeEqual = (left: string, right: string) => {
   const leftBuffer = Buffer.from(left);
@@ -158,23 +227,29 @@ const timingSafeEqual = (left: string, right: string) => {
 const verifyWebhookSecret = (rawBody: Buffer | undefined, headers: Record<string, string | string[] | undefined>, querySecret?: string) => {
   if (!env.WAHA_WEBHOOK_SECRET) return;
 
-  if (querySecret && timingSafeEqual(querySecret, env.WAHA_WEBHOOK_SECRET)) return;
+  const webhookSecret = env.WAHA_WEBHOOK_SECRET;
 
-  const signatureHeader =
-    headers["x-waha-signature"] ??
-    headers["x-webhook-hmac-sha256"] ??
-    headers["x-hub-signature-256"] ??
-    headers["x-signature"];
+  if (querySecret && timingSafeEqual(querySecret, webhookSecret)) return;
+
+  const webhookHmacHeader = headers["x-webhook-hmac"];
+  const webhookHmacAlgorithmHeader = headers["x-webhook-hmac-algorithm"];
+  const signatureHeader = webhookHmacHeader ?? headers["x-waha-signature"] ?? headers["x-webhook-hmac-sha256"] ?? headers["x-hub-signature-256"] ?? headers["x-signature"];
   const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
 
   if (!signature || !rawBody) {
     throw new AppError("Invalid WAHA webhook signature", 401);
   }
 
-  const received = signature.replace(/^sha256=/, "");
-  const expected = crypto.createHmac("sha256", env.WAHA_WEBHOOK_SECRET).update(rawBody).digest("hex");
+  const received = signature.replace(/^sha(256|512)=/, "");
+  const requestedAlgorithm = Array.isArray(webhookHmacAlgorithmHeader) ? webhookHmacAlgorithmHeader[0] : webhookHmacAlgorithmHeader;
+  const algorithms = webhookHmacHeader ? [requestedAlgorithm === "sha256" ? "sha256" : "sha512"] : ["sha256", "sha512"];
+  const matchesSignature = algorithms.some((algorithm) => {
+    const expected = crypto.createHmac(algorithm, webhookSecret).update(rawBody).digest("hex");
 
-  if (!timingSafeEqual(received, expected)) {
+    return timingSafeEqual(received, expected);
+  });
+
+  if (!matchesSignature) {
     throw new AppError("Invalid WAHA webhook signature", 401);
   }
 };
@@ -246,20 +321,10 @@ const syncSessionStatusFromWaha = async (session: NonNullable<Awaited<ReturnType
   const wahaSession = await wahaRequest<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(session.sessionName)}`);
   const nextStatus = normalizeWahaStatus(asString(wahaSession.status));
   const me = wahaSession.me && typeof wahaSession.me === "object" ? (wahaSession.me as Record<string, unknown>) : null;
-  const now = new Date();
 
-  return prisma.whatsappSession.update({
-    where: { id: session.id },
-    data: {
-      status: nextStatus,
-      qrCode: nextStatus === "CONNECTED" ? null : session.qrCode,
-      phoneNumber: asString(me?.id)?.replace(/@.*/, "") ?? session.phoneNumber,
-      displayName: asString(me?.pushName) ?? session.displayName,
-      connectedAt: nextStatus === "CONNECTED" ? session.connectedAt ?? now : session.connectedAt,
-      disconnectedAt: nextStatus === "DISCONNECTED" ? now : session.disconnectedAt,
-      lastStatusAt: now,
-      lastError: nextStatus === "CONNECTED" ? null : session.lastError
-    }
+  return updateSessionFromWahaStatus(session, nextStatus, {
+    phoneNumber: asString(me?.id)?.replace(/@.*/, ""),
+    displayName: asString(me?.pushName)
   });
 };
 
@@ -284,6 +349,57 @@ export const mapSession = (session: Awaited<ReturnType<typeof prisma.whatsappSes
         updatedAt: session.updatedAt
       }
     : null;
+
+const emitSessionUpdate = (session: NonNullable<Awaited<ReturnType<typeof prisma.whatsappSession.findUnique>>>, event = "whatsapp.session_updated") => {
+  const mapped = mapSession(session);
+  getSocketServer()?.to(`tenant:${session.tenantId}`).emit(event, mapped);
+  if (event !== "whatsapp.session_updated") {
+    getSocketServer()?.to(`tenant:${session.tenantId}`).emit("whatsapp.session_updated", mapped);
+  }
+};
+
+const updateSessionFromWahaStatus = async (
+  session: NonNullable<Awaited<ReturnType<typeof prisma.whatsappSession.findUnique>>>,
+  nextStatus: WhatsappSessionStatus,
+  input: { qrCode?: string | null; phoneNumber?: string | null; displayName?: string | null; lastError?: string | null } = {}
+) => {
+  const now = new Date();
+  const shouldIgnorePendingQr = session.status === "CONNECTED" && nextStatus === "PENDING_QR";
+
+  if (shouldIgnorePendingQr) {
+    logWhatsapp("info", "ignored stale QR status for connected session", {
+      tenantId: session.tenantId,
+      sessionName: session.sessionName,
+      currentStatus: session.status,
+      nextStatus
+    });
+    return session;
+  }
+
+  const updated = await prisma.whatsappSession.update({
+    where: { id: session.id },
+    data: {
+      status: nextStatus,
+      qrCode: nextStatus === "CONNECTED" ? null : input.qrCode ?? session.qrCode,
+      phoneNumber: input.phoneNumber ?? session.phoneNumber,
+      displayName: input.displayName ?? session.displayName,
+      connectedAt: nextStatus === "CONNECTED" ? session.connectedAt ?? now : session.connectedAt,
+      disconnectedAt: nextStatus === "DISCONNECTED" ? now : session.disconnectedAt,
+      lastStatusAt: now,
+      lastError: nextStatus === "CONNECTED" ? null : input.lastError ?? session.lastError
+    }
+  });
+
+  logWhatsapp("info", "session status updated", {
+    tenantId: updated.tenantId,
+    sessionName: updated.sessionName,
+    previousStatus: session.status,
+    nextStatus: updated.status
+  });
+  emitSessionUpdate(updated, input.qrCode ? "whatsapp.qr_updated" : "whatsapp.session_updated");
+
+  return updated;
+};
 
 const mapTemplate = (template: Awaited<ReturnType<typeof prisma.whatsappMessageTemplate.findFirst>>) =>
   template
@@ -385,9 +501,7 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   }
 
   const sessionName = sessionNameForTenant(tenant.slug);
-  const webhookUrl = `${env.PUBLIC_BACKEND_URL.replace(/\/$/, "")}/public/webhooks/waha${
-    env.WAHA_WEBHOOK_SECRET ? `?secret=${encodeURIComponent(env.WAHA_WEBHOOK_SECRET)}` : ""
-  }`;
+  const webhookUrl = `${env.PUBLIC_BACKEND_URL.replace(/\/$/, "")}/public/webhooks/waha`;
 
   const session = await prisma.whatsappSession.upsert({
     where: { tenantId },
@@ -409,7 +523,8 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   const webhooks = [
     {
       url: webhookUrl,
-      events: ["message", "session.status"]
+      events: ["message", "session.status"],
+      ...(env.WAHA_WEBHOOK_SECRET ? { hmac: { key: env.WAHA_WEBHOOK_SECRET } } : {})
     }
   ];
 
@@ -497,16 +612,7 @@ export const refreshSessionQr = async (tenantId: string): Promise<ReturnType<typ
     const message = error instanceof Error ? error.message : "";
 
     if (message.includes("Session status is not as expected") || message.includes('"status":"WORKING"')) {
-      const connected = await prisma.whatsappSession.update({
-        where: { id: session.id },
-        data: {
-          status: "CONNECTED",
-          qrCode: null,
-          connectedAt: session.connectedAt ?? new Date(),
-          lastStatusAt: new Date(),
-          lastError: null
-        }
-      });
+      const connected = await updateSessionFromWahaStatus(session, "CONNECTED");
 
       return mapSession(connected);
     }
@@ -524,15 +630,19 @@ export const refreshSessionQr = async (tenantId: string): Promise<ReturnType<typ
         asString((response as Record<string, unknown>).qrCode) ??
         asString((response as Record<string, unknown>).image);
 
-  const updated = await prisma.whatsappSession.update({
-    where: { id: session.id },
-    data: {
-      qrCode,
-      status: qrCode ? "PENDING_QR" : session.status,
-      lastStatusAt: new Date(),
-      lastError: null
-    }
-  });
+  const updated = qrCode
+    ? await updateSessionFromWahaStatus(syncedSession, "PENDING_QR", { qrCode, lastError: null })
+    : await prisma.whatsappSession.update({
+        where: { id: session.id },
+        data: {
+          lastStatusAt: new Date(),
+          lastError: null
+        }
+      });
+
+  if (!qrCode) {
+    emitSessionUpdate(updated);
+  }
 
   return mapSession(updated);
 };
@@ -585,7 +695,78 @@ export const updateSettings = async (tenantId: string, data: SessionSettingsInpu
   return mapSession(updated);
 };
 
-export const sendTextMessage = async (tenantId: string, phone: string, text: string) => {
+export const getWahaConnectivityHealth = async (tenantId: string) => {
+  const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const startedAt = Date.now();
+
+  try {
+    const sessionsResult = await wahaRequestWithMeta<unknown>("/api/sessions", { timeoutMs: 5_000 });
+    let wahaSession: Record<string, unknown> | null = null;
+
+    if (session) {
+      wahaSession = await wahaRequest<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(session.sessionName)}`, { timeoutMs: 5_000 }).catch(() => null);
+    }
+
+    const rawStatus = asString(wahaSession?.status);
+    const normalizedStatus = rawStatus ? normalizeWahaStatus(rawStatus) : null;
+
+    logWhatsapp("info", "WAHA connectivity health ok", {
+      tenantId,
+      sessionId: session?.id,
+      sessionName: session?.sessionName,
+      wahaStatus: rawStatus,
+      durationMs: Date.now() - startedAt
+    });
+
+    return {
+      ok: true,
+      wahaReachable: true,
+      sessionName: session?.sessionName ?? null,
+      internalStatus: session?.status ?? null,
+      wahaStatus: rawStatus ?? null,
+      normalizedWahaStatus: normalizedStatus,
+      latencyMs: Date.now() - startedAt,
+      listSessionsStatus: sessionsResult.status,
+      baseUrlHost: new URL(wahaBaseUrl()).host,
+      checkedAt: new Date().toISOString()
+    };
+  } catch (error) {
+    const details = getErrorDetails(error);
+
+    logWhatsapp("warn", "WAHA connectivity health failed", {
+      tenantId,
+      sessionId: session?.id,
+      sessionName: session?.sessionName,
+      code: details.code,
+      wahaStatus: details.wahaStatus,
+      durationMs: details.durationMs ?? Date.now() - startedAt,
+      error: getWahaErrorMessage(error)
+    });
+
+    return {
+      ok: false,
+      wahaReachable: false,
+      sessionName: session?.sessionName ?? null,
+      internalStatus: session?.status ?? null,
+      latencyMs: Date.now() - startedAt,
+      error: {
+        code: details.code ?? "WAHA_UNREACHABLE",
+        message: getWahaErrorMessage(error),
+        wahaStatus: details.wahaStatus ?? null
+      },
+      baseUrlHost: (() => {
+        try {
+          return new URL(wahaBaseUrl()).host;
+        } catch {
+          return null;
+        }
+      })(),
+      checkedAt: new Date().toISOString()
+    };
+  }
+};
+
+export const sendTextMessage = async (tenantId: string, phone: string, text: string, options: SendTextMessageOptions = {}) => {
   const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
 
   if (!session) {
@@ -597,14 +778,61 @@ export const sendTextMessage = async (tenantId: string, phone: string, text: str
   }
 
   const chatId = toChatId(phone);
-  const response = await wahaRequest<Record<string, unknown>>("/api/sendText", {
-    method: "POST",
-    body: {
-      session: session.sessionName,
-      chatId,
-      text
-    }
+  const source = options.source ?? "manual";
+
+  logWhatsapp("info", "WhatsApp outbound send requested", {
+    tenantId,
+    sessionId: session.id,
+    sessionName: session.sessionName,
+    chatIdMasked: maskIdentifier(chatId),
+    source
   });
+
+  let response: Record<string, unknown>;
+  let responseStatus = 0;
+  let durationMs = 0;
+
+  try {
+    const result = await wahaRequestWithMeta<Record<string, unknown>>("/api/sendText", {
+      method: "POST",
+      body: {
+        session: session.sessionName,
+        chatId,
+        text
+      }
+    });
+
+    response = result.data;
+    responseStatus = result.status;
+    durationMs = result.durationMs;
+  } catch (error) {
+    const details = getErrorDetails(error);
+    const message = getWahaErrorMessage(error);
+
+    await prisma.whatsappSession.update({
+      where: { id: session.id },
+      data: { lastError: message, lastStatusAt: new Date() }
+    });
+
+    logWhatsapp("error", "WhatsApp outbound send failed", {
+      tenantId,
+      sessionId: session.id,
+      sessionName: session.sessionName,
+      chatIdMasked: maskIdentifier(chatId),
+      source,
+      code: details.code,
+      wahaStatus: details.wahaStatus,
+      durationMs: details.durationMs,
+      error: message
+    });
+
+    throw new AppError(message, error instanceof AppError ? error.statusCode : 502, {
+      code: details.code ?? "WAHA_SEND_REJECTED",
+      wahaStatus: details.wahaStatus,
+      durationMs: details.durationMs,
+      source
+    });
+  }
 
   await prisma.whatsappMessage.create({
     data: {
@@ -619,7 +847,48 @@ export const sendTextMessage = async (tenantId: string, phone: string, text: str
     }
   });
 
-  return { sent: true };
+  logWhatsapp("info", "WhatsApp outbound send succeeded", {
+    tenantId,
+    sessionId: session.id,
+    sessionName: session.sessionName,
+    chatIdMasked: maskIdentifier(chatId),
+    source,
+    wahaStatus: responseStatus,
+    durationMs,
+    externalId: getExternalId(response)
+  });
+
+  return {
+    sent: true,
+    wahaStatus: responseStatus,
+    latencyMs: durationMs,
+    messageId: getExternalId(response) ?? null
+  };
+};
+
+export const deleteMessage = async (tenantId: string, id: string) => {
+  const message = await prisma.whatsappMessage.findFirst({
+    where: { id, tenantId, deletedAt: null }
+  });
+
+  if (!message) {
+    throw new AppError("WhatsApp message not found", 404);
+  }
+
+  const deleted = await prisma.whatsappMessage.update({
+    where: { id },
+    data: { deletedAt: new Date() }
+  });
+
+  getSocketServer()?.to(`tenant:${tenantId}`).emit("whatsapp.message_deleted", {
+    id,
+    tenantId,
+    sessionId: deleted.sessionId,
+    conversationId: deleted.conversationId,
+    deletedAt: deleted.deletedAt
+  });
+
+  return deleted;
 };
 
 export const handleWebhook = async (
@@ -630,46 +899,78 @@ export const handleWebhook = async (
 ) => {
   verifyWebhookSecret(rawBody, headers, querySecret);
 
+  void processWebhook(body).catch((error) => {
+    logWhatsapp("error", "unhandled webhook processing error", {
+      error: error instanceof Error ? error.message : String(error),
+      eventType: body.event ?? body.type
+    });
+  });
+
+  return { received: true };
+};
+
+const processWebhook = async (body: WahaWebhookBody) => {
   const eventType = body.event ?? body.type ?? "message";
   const payload = (body.payload ?? body) as Record<string, unknown>;
   const sessionName = body.session ?? asString(payload.session) ?? asString(payload.sessionName);
   const session = sessionName ? await prisma.whatsappSession.findUnique({ where: { sessionName }, include: { tenant: { include: { settings: true } } } }) : null;
+  const webhookExternalId = eventType.includes("message") && sessionName ? getStableMessageId(sessionName, payload) : getExternalId(payload);
 
   const webhookEvent = await prisma.webhookEvent.create({
     data: {
       tenantId: session?.tenantId,
       provider: "waha",
       eventType,
-      externalId: getExternalId(payload),
+      externalId: webhookExternalId,
       payload: body as Prisma.InputJsonObject
     }
   });
 
   if (!session) {
+    logWhatsapp("warn", "webhook session not found", { eventType, sessionName });
     await prisma.webhookEvent.update({ where: { id: webhookEvent.id }, data: { processedAt: new Date(), error: "Session not found" } });
     return { received: true };
   }
 
-  if (eventType.includes("session")) {
-    const nextStatus = normalizeWahaStatus(asString(payload.status));
-    await prisma.whatsappSession.update({
-      where: { id: session.id },
-      data: {
-        status: nextStatus,
-        qrCode: nextStatus === "CONNECTED" ? null : session.qrCode,
-        phoneNumber: asString(payload.me) ?? session.phoneNumber,
-        connectedAt: nextStatus === "CONNECTED" ? new Date() : session.connectedAt,
-        disconnectedAt: nextStatus === "DISCONNECTED" ? new Date() : session.disconnectedAt,
-        lastStatusAt: new Date()
-      }
+  try {
+    logWhatsapp("info", "webhook received", {
+      tenantId: session.tenantId,
+      sessionName,
+      eventType,
+      externalId: webhookExternalId
     });
+
+    const qrCode = getPayloadQrCode(payload);
+    if (qrCode) {
+      await updateSessionFromWahaStatus(session, "PENDING_QR", { qrCode });
+    }
+
+    if (eventType.includes("session")) {
+      const me = payload.me && typeof payload.me === "object" ? (payload.me as Record<string, unknown>) : null;
+      const nextStatus = normalizeWahaStatus(asString(payload.status) ?? asString(payload.state));
+      await updateSessionFromWahaStatus(session, nextStatus, {
+        phoneNumber: asString(me?.id)?.replace(/@.*/, ""),
+        displayName: asString(me?.pushName),
+        lastError: asString(payload.error) ?? asString(payload.message)
+      });
+    }
+
+    if (eventType.includes("message")) {
+      await handleIncomingMessage(session, payload);
+    }
+
+    await prisma.webhookEvent.update({ where: { id: webhookEvent.id }, data: { processedAt: new Date() } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Webhook processing failed";
+    logWhatsapp("error", "webhook processing failed", {
+      tenantId: session.tenantId,
+      sessionName,
+      eventType,
+      error: message
+    });
+    await prisma.webhookEvent.update({ where: { id: webhookEvent.id }, data: { processedAt: new Date(), error: message } });
   }
 
-  if (eventType.includes("message")) {
-    await handleIncomingMessage(session, payload);
-  }
-
-  await prisma.webhookEvent.update({ where: { id: webhookEvent.id }, data: { processedAt: new Date() } });
   return { received: true };
 };
 
@@ -719,7 +1020,7 @@ const handleIncomingMessage = async (
     }
   });
 
-  const externalId = getExternalId(payload);
+  const externalId = getStableMessageId(session.sessionName, payload);
   let messageCreated = false;
 
   await prisma.whatsappMessage
@@ -745,11 +1046,28 @@ const handleIncomingMessage = async (
     })
     .catch((error) => {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        logWhatsapp("info", "duplicate message webhook ignored", {
+          tenantId: session.tenantId,
+          sessionName: session.sessionName,
+          chatId,
+          externalId
+        });
         messageCreated = false;
         return;
       }
       throw error;
     });
+
+  if (messageCreated) {
+    getSocketServer()?.to(`tenant:${session.tenantId}`).emit("whatsapp.message_received", {
+      tenantId: session.tenantId,
+      sessionId: session.id,
+      conversationId: conversation.id,
+      chatId,
+      direction: fromMe ? "OUTBOUND" : "INBOUND",
+      receivedAt
+    });
+  }
 
   if (!fromMe && messageCreated && session.autoReplyEnabled && body) {
     const botState = conversation.botState && typeof conversation.botState === "object" ? (conversation.botState as Record<string, unknown>) : {};
@@ -770,7 +1088,17 @@ const handleIncomingMessage = async (
       return;
     }
 
-    await sendTextMessage(session.tenantId, chatId, message).then(async () => {
+    if (env.WHATSAPP_AUTO_REPLY_DELAY_MS > 0) {
+      logWhatsapp("info", "auto reply scheduled", {
+        tenantId: session.tenantId,
+        sessionName: session.sessionName,
+        chatId,
+        delayMs: env.WHATSAPP_AUTO_REPLY_DELAY_MS
+      });
+      await sleep(env.WHATSAPP_AUTO_REPLY_DELAY_MS);
+    }
+
+    await sendTextMessage(session.tenantId, chatId, message, { source: "auto_reply" }).then(async () => {
       await prisma.whatsappConversation.update({
         where: { id: conversation.id },
         data: {
@@ -814,7 +1142,7 @@ export const notifyOrderStatusChanged = async (tenantId: string, orderId: string
 
   if (!message) return;
 
-  await sendTextMessage(tenantId, order.customerPhone, message).catch(async (error) => {
+  await sendTextMessage(tenantId, order.customerPhone, message, { source: "order_status" }).catch(async (error) => {
     await prisma.whatsappSession.update({
       where: { id: session.id },
       data: { lastError: error instanceof Error ? error.message : "Could not send order notification" }
