@@ -4,12 +4,13 @@ const deliveryZoneBodySchema = z
   .object({
     branchId: z.string().min(1),
     name: z.string().min(2),
-    type: z.enum(["NEIGHBORHOOD", "POSTAL_CODE", "RADIUS", "RADIUS_OVERFLOW"]),
+    type: z.enum(["NEIGHBORHOOD", "RADIUS", "RADIUS_OVERFLOW"]),
     neighborhood: z.string().optional(),
     postalCodeStart: z.string().optional(),
     postalCodeEnd: z.string().optional(),
     radiusKm: z.number().nonnegative().optional(),
-    distanceMode: z.enum(["ROUTE", "STRAIGHT_LINE"]).default("ROUTE"),
+    distanceMode: z.literal("STRAIGHT_LINE").default("STRAIGHT_LINE"),
+    color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
     fee: z.number().nonnegative(),
     minimumOrderValue: z.number().nonnegative().default(0),
     estimatedMinutes: z.number().int().positive().optional(),
@@ -18,10 +19,6 @@ const deliveryZoneBodySchema = z
   .superRefine((data, ctx) => {
     if (data.type === "NEIGHBORHOOD" && !data.neighborhood?.trim()) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["neighborhood"], message: "Neighborhood is required" });
-    }
-
-    if (data.type === "POSTAL_CODE" && (!data.postalCodeStart || !data.postalCodeEnd)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["postalCodeStart"], message: "Postal code range is required" });
     }
 
     if (data.type === "RADIUS" && !data.radiusKm) {
@@ -40,6 +37,12 @@ export const updateDeliveryZoneSchema = z.object({
 
 export const deleteDeliveryZoneSchema = z.object({
   params: z.object({ id: z.string().min(1) })
+});
+
+export const updateDeliveryCalculationMethodSchema = z.object({
+  body: z.object({
+    method: z.enum(["NEIGHBORHOOD", "STRAIGHT_LINE"])
+  })
 });
 
 export const publicDeliveryZonesSchema = z.object({

@@ -7,6 +7,10 @@ type PublicTenantResponse = Tenant & {
   settings: TenantSettings;
 };
 
+function normalizeDeliveryCalculationMethod(method: unknown): TenantSettings["deliveryCalculationMethod"] {
+  return method === "NEIGHBORHOOD" ? "NEIGHBORHOOD" : "STRAIGHT_LINE";
+}
+
 export const tenantsService = {
   getCurrentTenant: async (publicTenantSlug?: string | null) => {
     if (!publicTenantSlug && getAuthToken() && getTenantId()) {
@@ -22,7 +26,8 @@ export const tenantsService = {
             bundle.settings.logoUrl ||
             "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80",
           primaryColor: bundle.settings.primaryColor || "#0f766e",
-          secondaryColor: bundle.settings.secondaryColor || "#27ae51"
+          secondaryColor: bundle.settings.secondaryColor || "#27ae51",
+          deliveryCalculationMethod: normalizeDeliveryCalculationMethod(bundle.settings.deliveryCalculationMethod)
         }
       };
     }
@@ -38,7 +43,8 @@ export const tenantsService = {
         logoUrl:
           tenant.settings.logoUrl ||
           "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80",
-        primaryColor: tenant.settings.primaryColor || "#0f766e"
+          primaryColor: tenant.settings.primaryColor || "#0f766e",
+          deliveryCalculationMethod: normalizeDeliveryCalculationMethod(tenant.settings.deliveryCalculationMethod)
       }
     };
   },
@@ -73,7 +79,8 @@ export const tenantsService = {
         defaultPreparationTime: Number(bundle.settings.defaultPreparationTime),
         logoUrl: bundle.settings.logoUrl || "",
         primaryColor: bundle.settings.primaryColor || "#0f766e",
-        secondaryColor: bundle.settings.secondaryColor || "#27ae51"
+        secondaryColor: bundle.settings.secondaryColor || "#27ae51",
+        deliveryCalculationMethod: normalizeDeliveryCalculationMethod(bundle.settings.deliveryCalculationMethod)
       }
     };
   }

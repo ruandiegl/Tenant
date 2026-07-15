@@ -1,6 +1,7 @@
 export type TenantStatus = "ACTIVE" | "SUSPENDED" | "CANCELLED" | "TRIAL";
 export type UserStatus = "ACTIVE" | "INVITED" | "SUSPENDED" | "DISABLED";
 export type BranchStatus = "ACTIVE" | "INACTIVE" | "CLOSED_TEMPORARILY";
+export type DeliveryCalculationMethod = "NEIGHBORHOOD" | "STRAIGHT_LINE";
 export type ProductStatus = "ACTIVE" | "INACTIVE" | "OUT_OF_STOCK" | "ARCHIVED";
 export type OrderType = "DELIVERY" | "PICKUP" | "DINE_IN";
 export type OrderStatus =
@@ -79,6 +80,7 @@ export type TenantSettings = {
   autoAcceptOrders: boolean;
   defaultPreparationTime: number;
   minimumOrderValue: number;
+  deliveryCalculationMethod?: DeliveryCalculationMethod;
 };
 
 export type WhatsappSession = BaseEntity & {
@@ -125,12 +127,13 @@ export type DeliveryZone = BaseEntity & {
   tenantId: string;
   branchId: string;
   name: string;
-  type: "NEIGHBORHOOD" | "POSTAL_CODE" | "RADIUS" | "RADIUS_OVERFLOW";
+  type: "NEIGHBORHOOD" | "RADIUS" | "RADIUS_OVERFLOW";
   neighborhood?: string;
   postalCodeStart?: string;
   postalCodeEnd?: string;
   radiusKm?: number;
-  distanceMode?: "ROUTE" | "STRAIGHT_LINE";
+  distanceMode?: "STRAIGHT_LINE";
+  color?: string;
   fee: number;
   minimumOrderValue: number;
   estimatedMinutes?: number;

@@ -258,6 +258,28 @@
   color: var(--danger);
 }
 
+.neighborhood-select-field {
+  grid-column: 1 / -1;
+}
+
+.neighborhood-select-field .shadcn-select-trigger {
+  background: #e8f5ee;
+  border-color: #9fcab3;
+  color: var(--brand-dark);
+  min-height: 50px;
+}
+
+.field input:disabled {
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
+  cursor: not-allowed;
+}
+
+.field div:has(input:disabled) {
+  background: color-mix(in srgb, var(--surface-strong) 62%, #ffffff);
+  border-color: color-mix(in srgb, var(--line) 70%, transparent);
+  opacity: 0.72;
+}
+
 .pickup-summary {
   align-items: start;
   background: #e8f5ee;

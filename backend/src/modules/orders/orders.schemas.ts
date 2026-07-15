@@ -25,6 +25,7 @@ export const createPublicOrderSchema = z.object({
     notes: z.string().optional(),
     couponCode: z.string().optional(),
     deliveryFee: z.number().nonnegative().optional(),
+    deliveryZoneId: z.string().optional(),
     deliveryAddress: z
       .object({
         street: z.string().min(1),
@@ -33,7 +34,7 @@ export const createPublicOrderSchema = z.object({
         district: z.string().min(1),
         city: z.string().min(1),
         state: z.string().min(2),
-        postalCode: z.string().min(3),
+        postalCode: z.string().optional().default(""),
         reference: z.string().optional()
       })
       .optional(),

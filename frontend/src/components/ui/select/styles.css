@@ -1,0 +1,122 @@
+.shadcn-select-trigger {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  display: inline-flex;
+  font: inherit;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 48px;
+  outline: none;
+  padding: 0 12px;
+  width: 100%;
+}
+
+.shadcn-select-trigger:hover {
+  border-color: color-mix(in srgb, var(--brand) 46%, var(--line));
+}
+
+.shadcn-select-trigger:focus-visible,
+.shadcn-select-trigger[data-state="open"] {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+
+.shadcn-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.shadcn-select-trigger > svg {
+  color: var(--muted);
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.shadcn-select-trigger[data-state="open"] > svg {
+  transform: rotate(180deg);
+}
+
+.shadcn-select-content {
+  animation: shadcn-select-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 16px 38px rgba(7, 19, 24, 0.16);
+  max-height: min(320px, var(--radix-select-content-available-height));
+  min-width: var(--radix-select-trigger-width);
+  overflow: hidden;
+  position: relative;
+  z-index: 1200;
+}
+
+.shadcn-select-viewport {
+  padding: 5px;
+}
+
+.shadcn-select-item {
+  align-items: center;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: default;
+  display: flex;
+  font-size: 0.92rem;
+  min-height: 40px;
+  outline: none;
+  padding: 7px 34px 7px 10px;
+  position: relative;
+  user-select: none;
+}
+
+.shadcn-select-item[data-highlighted] {
+  background: var(--surface-strong);
+  color: var(--brand-dark);
+}
+
+.shadcn-select-item[data-disabled] {
+  opacity: 0.45;
+}
+
+.shadcn-select-item-indicator {
+  align-items: center;
+  color: var(--brand);
+  display: inline-flex;
+  justify-content: center;
+  position: absolute;
+  right: 10px;
+}
+
+.shadcn-select-label {
+  color: var(--muted);
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.shadcn-select-separator {
+  background: var(--line);
+  height: 1px;
+  margin: 4px;
+}
+
+.shadcn-select-scroll-button {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  height: 28px;
+  justify-content: center;
+}
+
+@keyframes shadcn-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

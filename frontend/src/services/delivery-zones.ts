@@ -1,4 +1,4 @@
-import { DeliveryZone } from "../types/database";
+import { DeliveryCalculationMethod, DeliveryZone } from "../types/database";
 import { api, protectedApi } from "./api";
 
 type BackendDeliveryZone = Omit<DeliveryZone, "fee" | "minimumOrderValue" | "radiusKm"> & {
@@ -10,12 +10,13 @@ type BackendDeliveryZone = Omit<DeliveryZone, "fee" | "minimumOrderValue" | "rad
 export type DeliveryZonePayload = {
   branchId: string;
   name: string;
-  type: "NEIGHBORHOOD" | "POSTAL_CODE" | "RADIUS" | "RADIUS_OVERFLOW";
+  type: "NEIGHBORHOOD" | "RADIUS" | "RADIUS_OVERFLOW";
   neighborhood?: string;
   postalCodeStart?: string;
   postalCodeEnd?: string;
   radiusKm?: number;
-  distanceMode?: "ROUTE" | "STRAIGHT_LINE";
+  distanceMode?: "STRAIGHT_LINE";
+  color?: string;
   fee: number;
   minimumOrderValue: number;
   estimatedMinutes?: number;
@@ -29,7 +30,8 @@ function mapDeliveryZone(zone: BackendDeliveryZone): DeliveryZone {
     postalCodeStart: zone.postalCodeStart ?? undefined,
     postalCodeEnd: zone.postalCodeEnd ?? undefined,
     radiusKm: zone.radiusKm === null || zone.radiusKm === undefined ? undefined : Number(zone.radiusKm),
-    distanceMode: zone.distanceMode ?? "ROUTE",
+    distanceMode: zone.distanceMode === "STRAIGHT_LINE" ? "STRAIGHT_LINE" : undefined,
+    color: zone.color ?? undefined,
     fee: Number(zone.fee),
     minimumOrderValue: Number(zone.minimumOrderValue),
     estimatedMinutes: zone.estimatedMinutes ?? undefined
@@ -55,6 +57,11 @@ export const deliveryZonesService = {
   remove: async (id: string) =>
     protectedApi<void>(`/tenant/delivery-zones/${id}`, {
       method: "DELETE"
+    }),
+  updateCalculationMethod: async (method: DeliveryCalculationMethod) =>
+    protectedApi<{ method: DeliveryCalculationMethod }>("/tenant/delivery-zones/calculation-method", {
+      method: "PATCH",
+      body: JSON.stringify({ method })
     }),
   listPublic: async (tenantSlug: string) => (await api<BackendDeliveryZone[]>(`/public/${tenantSlug}/delivery-zones`)).map(mapDeliveryZone)
 };

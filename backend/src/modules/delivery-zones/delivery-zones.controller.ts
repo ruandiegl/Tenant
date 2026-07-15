@@ -25,6 +25,14 @@ export const create: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const updateCalculationMethod: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.updateDeliveryCalculationMethod(req.tenantId!, req.body.method, req.auth?.userId));
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const update: RequestHandler = async (req, res, next) => {
   try {
     return res.json(await service.updateDeliveryZone(req.tenantId!, req.params.id, req.body, req.auth?.userId));

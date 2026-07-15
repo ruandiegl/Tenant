@@ -64,6 +64,7 @@ export type PlacedCustomerOrder = {
   total: number;
   paymentType: CustomerPaymentDraft["type"];
   estimatedReadyAt: string;
+  placedAt: string;
 };
 
 type CustomerFlowContextValue = {
@@ -124,6 +125,7 @@ const emptyProfile: CustomerProfileDraft = {
 };
 
 const CustomerFlowContext = createContext<CustomerFlowContextValue | null>(null);
+const ORDER_RETENTION_MS = 48 * 60 * 60 * 1000;
 
 type StoredCustomerFlow = {
   items?: CustomerCartItem[];
@@ -139,10 +141,39 @@ function getStorageKey(tenantSlug: string) {
   return `podepedir.customerFlow.${tenantSlug}.v1`;
 }
 
+function getOrderTimestamp(order: PlacedCustomerOrder) {
+  const timestamp = Date.parse(order.placedAt || order.estimatedReadyAt);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function isOrderWithinRetention(order: PlacedCustomerOrder, now = Date.now()) {
+  const timestamp = getOrderTimestamp(order);
+  return timestamp > 0 && now - timestamp < ORDER_RETENTION_MS;
+}
+
+function normalizeStoredOrder(order: PlacedCustomerOrder): PlacedCustomerOrder {
+  return {
+    ...order,
+    placedAt: order.placedAt || order.estimatedReadyAt
+  };
+}
+
 function readStoredFlow(tenantSlug: string): StoredCustomerFlow {
   try {
     const raw = window.localStorage.getItem(getStorageKey(tenantSlug));
-    return raw ? (JSON.parse(raw) as StoredCustomerFlow) : {};
+    if (!raw) return {};
+
+    const stored = JSON.parse(raw) as StoredCustomerFlow;
+    const order = stored.order ? normalizeStoredOrder(stored.order) : null;
+    const recentOrders = (stored.recentOrders ?? []).map(normalizeStoredOrder).filter((storedOrder) => isOrderWithinRetention(storedOrder));
+    const sanitized = {
+      ...stored,
+      order: order && isOrderWithinRetention(order) ? order : null,
+      recentOrders
+    };
+
+    window.localStorage.setItem(getStorageKey(tenantSlug), JSON.stringify(sanitized));
+    return sanitized;
   } catch {
     return {};
   }
@@ -213,6 +244,19 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
       recentOrders
     });
   }, [address, fulfillment, items, order, payment, profile, publicTenantSlug, recentOrders]);
+
+  useEffect(() => {
+    const removeExpiredOrders = () => {
+      setOrder((current) => (current && !isOrderWithinRetention(current) ? null : current));
+      setRecentOrders((current) => {
+        const retained = current.filter((storedOrder) => isOrderWithinRetention(storedOrder));
+        return retained.length === current.length ? current : retained;
+      });
+    };
+    const intervalId = window.setInterval(removeExpiredOrders, 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -291,6 +335,7 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
             customerPhone: profile.phone || undefined,
             customerEmail: profile.email || undefined,
             deliveryFee: totals.deliveryFee,
+            deliveryZoneId: fulfillment.type === "DELIVERY" ? fulfillment.zoneId : undefined,
             notes: `Pagamento selecionado: ${payment.type}${fulfillment.type === "PICKUP" ? " | Retirada na loja" : fulfillment.zoneName ? ` | Entrega: ${fulfillment.zoneName}` : ""}`,
             deliveryAddress:
               fulfillment.type === "DELIVERY"
@@ -323,7 +368,8 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
           status: createdOrder.status === "ACCEPTED" || createdOrder.status === "PREPARING" ? createdOrder.status : "PLACED",
           total: createdOrder.total,
           paymentType: payment.type,
-          estimatedReadyAt: createdOrder.estimatedReadyAt
+          estimatedReadyAt: createdOrder.estimatedReadyAt,
+          placedAt: createdOrder.createdAt || new Date().toISOString()
         };
 
         items.forEach((item) => decrementStock(item.productId, item.quantity));

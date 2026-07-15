@@ -5,6 +5,7 @@ import { AppError } from "../../shared/errors/app-error.js";
 import { notifyOrderStatusChanged } from "../whatsapp/whatsapp.service.js";
 
 const publicCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+const PUBLIC_ORDER_ACCESS_MS = 48 * 60 * 60 * 1000;
 
 type CreateOrderInput = {
   branchId: string;
@@ -15,6 +16,7 @@ type CreateOrderInput = {
   notes?: string;
   couponCode?: string;
   deliveryFee?: number;
+  deliveryZoneId?: string;
   deliveryAddress?: {
     street: string;
     number: string;
@@ -83,6 +85,84 @@ const emitOrderEvent = (event: string, order: { id: string; tenantId: string; br
     io.to(`kitchen:${order.branchId}`).emit("kitchen.order_started", order);
   }
 };
+
+function normalizeZoneText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+type DeliveryCalculationMethod = "NEIGHBORHOOD" | "STRAIGHT_LINE";
+
+function normalizeDeliveryCalculationMethod(method: string | null | undefined): DeliveryCalculationMethod {
+  return method === "NEIGHBORHOOD" ? "NEIGHBORHOOD" : "STRAIGHT_LINE";
+}
+
+function deliveryMethodWhere(method: DeliveryCalculationMethod): Prisma.DeliveryZoneWhereInput {
+  if (method === "NEIGHBORHOOD") return { type: "NEIGHBORHOOD" };
+
+  return {
+    type: { in: ["RADIUS", "RADIUS_OVERFLOW"] },
+    distanceMode: "STRAIGHT_LINE"
+  };
+}
+
+async function resolveDeliveryFee(params: {
+  tenantId: string;
+  branchId: string;
+  method: DeliveryCalculationMethod;
+  address: NonNullable<CreateOrderInput["deliveryAddress"]>;
+  subtotal: Prisma.Decimal;
+  deliveryZoneId?: string;
+  requestedFee?: number;
+}) {
+  const zones = await prisma.deliveryZone.findMany({
+    where: {
+      tenantId: params.tenantId,
+      branchId: params.branchId,
+      status: "ACTIVE",
+      minimumOrderValue: { lte: params.subtotal },
+      ...deliveryMethodWhere(params.method)
+    },
+    orderBy: [{ minimumOrderValue: "desc" }, { fee: "asc" }]
+  });
+
+  if (zones.length === 0) {
+    throw new AppError("Esta loja ainda nao possui area de entrega ativa para este metodo.", 400);
+  }
+
+  const scopedZones = params.deliveryZoneId ? zones.filter((zone) => zone.id === params.deliveryZoneId) : zones;
+
+  if (params.deliveryZoneId && scopedZones.length === 0) {
+    throw new AppError("Area de entrega invalida para este pedido.", 400);
+  }
+
+  if (params.method === "NEIGHBORHOOD") {
+    const district = normalizeZoneText(params.address.district);
+    const zone = scopedZones.find((entry) => normalizeZoneText(entry.neighborhood ?? "") === district);
+
+    if (!zone) {
+      throw new AppError("O bairro selecionado nao esta dentro da area de entrega ativa.", 400);
+    }
+
+    return zone.fee;
+  }
+
+  if (!params.deliveryZoneId) {
+    throw new AppError("Nao foi possivel validar a area de entrega para este endereco.", 400);
+  }
+
+  const requestedFee = new Prisma.Decimal(params.requestedFee ?? -1);
+  const zoneByFee = scopedZones.find((zone) => zone.fee.equals(requestedFee));
+
+  if (!zoneByFee) {
+    throw new AppError("Nao foi possivel validar a taxa de entrega para este endereco.", 400);
+  }
+
+  return zoneByFee.fee;
+}
 
 export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInput) => {
   const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, include: { settings: true } });
@@ -172,7 +252,18 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
   });
 
   const subtotal = preparedItems.reduce((sum, item) => sum.add(item.totalPrice), new Prisma.Decimal(0));
-  const deliveryFee = new Prisma.Decimal(data.deliveryFee ?? 0);
+  const deliveryFee =
+    data.type === "DELIVERY" && data.deliveryAddress
+      ? await resolveDeliveryFee({
+          tenantId: tenant.id,
+          branchId: branch.id,
+          method: normalizeDeliveryCalculationMethod(tenant.settings?.deliveryCalculationMethod),
+          address: data.deliveryAddress,
+          subtotal,
+          deliveryZoneId: data.deliveryZoneId,
+          requestedFee: data.deliveryFee
+        })
+      : new Prisma.Decimal(0);
   let discountTotal = new Prisma.Decimal(0);
 
   if (coupon) {
@@ -343,7 +434,11 @@ export const getPublicOrder = async (tenantSlug: string, publicCodeValue: string
   }
 
   const order = await prisma.order.findFirst({
-    where: { tenantId: tenant.id, publicCode: publicCodeValue },
+    where: {
+      tenantId: tenant.id,
+      publicCode: publicCodeValue,
+      createdAt: { gte: new Date(Date.now() - PUBLIC_ORDER_ACCESS_MS) }
+    },
     include: { items: { include: { options: true } }, deliveryAddress: true, histories: { orderBy: { createdAt: "asc" } } }
   });
 

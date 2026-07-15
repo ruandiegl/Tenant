@@ -40,7 +40,8 @@ export const tenantSettings: TenantSettings = {
   allowGuestCheckout: true,
   autoAcceptOrders: false,
   defaultPreparationTime: 28,
-  minimumOrderValue: 32
+  minimumOrderValue: 32,
+  deliveryCalculationMethod: "NEIGHBORHOOD"
 };
 
 export const mockTenantBundle = {

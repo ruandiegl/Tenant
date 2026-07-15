@@ -5,11 +5,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Bike, ChevronLeft, CreditCard, MapPin, Minus, Phone, Plus, ReceiptText, ShoppingBag, Store, Trash2, UserRound, WalletCards } from "lucide-react";
 import { toast } from "react-toastify";
 import { useCustomerFlow } from "../../../app/providers/customer-flow-provider";
+import { useTenant } from "../../../app/providers/tenant-provider";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { PageHeader } from "../../../components/ui/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { deliveryZonesService } from "../../../services/delivery-zones";
-import { DeliveryZone } from "../../../types/database";
+import { DeliveryCalculationMethod, DeliveryZone } from "../../../types/database";
 import { formatCurrency } from "../../../utils/format";
 import { formatCep, formatPhone, onlyDigits } from "../../../utils/input-masks";
 import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../../../utils/public-tenant-route";
@@ -19,7 +21,7 @@ type GeoPoint = { lat: number; lng: number };
 type ZoneDistanceMap = Record<string, number>;
 
 const geocodeCache = new Map<string, GeoPoint | null>();
-const routeDistanceCache = new Map<string, number | null>();
+const EMPTY_DELIVERY_ZONES: DeliveryZone[] = [];
 
 function normalizeZoneText(value: string) {
   return value
@@ -29,8 +31,8 @@ function normalizeZoneText(value: string) {
     .trim();
 }
 
-function deliveryDistanceLabel(zone: DeliveryZone) {
-  return (zone.distanceMode ?? "ROUTE") === "STRAIGHT_LINE" ? "em linha reta" : "de trajeto";
+function deliveryDistanceLabel() {
+  return "de raio";
 }
 
 function toRadians(value: number) {
@@ -48,45 +50,6 @@ function distanceInKm(origin: GeoPoint, destination: GeoPoint) {
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
 
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function routeCacheKey(origin: GeoPoint, destination: GeoPoint) {
-  return [
-    origin.lng.toFixed(6),
-    origin.lat.toFixed(6),
-    destination.lng.toFixed(6),
-    destination.lat.toFixed(6)
-  ].join(",");
-}
-
-async function routeDistanceInKm(origin: GeoPoint, destination: GeoPoint, signal?: AbortSignal) {
-  const key = routeCacheKey(origin, destination);
-  const cached = routeDistanceCache.get(key);
-
-  if (cached !== undefined) return cached;
-
-  const coordinates = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
-  const params = new URLSearchParams({
-    alternatives: "false",
-    overview: "false",
-    steps: "false"
-  });
-  const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?${params.toString()}`, {
-    signal,
-    headers: { Accept: "application/json" }
-  });
-
-  if (!response.ok) {
-    routeDistanceCache.set(key, null);
-    return null;
-  }
-
-  const result = (await response.json()) as { code?: string; routes?: Array<{ distance?: number }> };
-  const distanceMeters = result.code === "Ok" ? result.routes?.[0]?.distance : undefined;
-  const distanceKm = typeof distanceMeters === "number" ? distanceMeters / 1000 : null;
-
-  routeDistanceCache.set(key, distanceKm);
-  return distanceKm;
 }
 
 function addressToQuery(address: {
@@ -136,24 +99,16 @@ function findDeliveryZone(
   subtotal: number,
   zoneDistances: ZoneDistanceMap
 ) {
-  const eligibleZones = zones.filter((zone) => zone.status === "ACTIVE" && subtotal >= zone.minimumOrderValue);
+  const activeZones = zones.filter((zone) => zone.status === "ACTIVE");
+  const eligibleZones = activeZones.filter((zone) => subtotal >= zone.minimumOrderValue);
   const district = normalizeZoneText(address.district);
+  const configuredNeighborhoodZones = activeZones.filter((zone) => zone.type === "NEIGHBORHOOD" && zone.neighborhood?.trim());
   const neighborhoodZone = eligibleZones.find(
     (zone) => zone.type === "NEIGHBORHOOD" && normalizeZoneText(zone.neighborhood ?? "") === district
   );
 
   if (neighborhoodZone) return neighborhoodZone;
-
-  const cep = Number(onlyDigits(address.postalCode));
-  const postalCodeZone = eligibleZones.find((zone) => {
-    if (zone.type !== "POSTAL_CODE") return false;
-
-    const start = Number(onlyDigits(zone.postalCodeStart ?? ""));
-    const end = Number(onlyDigits(zone.postalCodeEnd ?? ""));
-    return Boolean(cep && start && end && cep >= start && cep <= end);
-  });
-
-  if (postalCodeZone) return postalCodeZone;
+  if (configuredNeighborhoodZones.length > 0) return undefined;
 
   const radiusZones = eligibleZones
     .filter((zone) => zone.type === "RADIUS")
@@ -169,9 +124,8 @@ function findDeliveryZone(
     .filter((zone) => zone.type === "RADIUS_OVERFLOW")
     .filter((zone) => {
       const distance = zoneDistances[zone.id];
-      const mode = zone.distanceMode ?? "ROUTE";
       const largestRadiusKm = eligibleZones
-        .filter((radiusZone) => radiusZone.type === "RADIUS" && (radiusZone.distanceMode ?? "ROUTE") === mode)
+        .filter((radiusZone) => radiusZone.type === "RADIUS")
         .reduce((largest, radiusZone) => Math.max(largest, radiusZone.radiusKm ?? 0), 0);
 
       return distance !== undefined && distance > largestRadiusKm;
@@ -179,11 +133,29 @@ function findDeliveryZone(
     .sort((a, b) => (zoneDistances[a.id] ?? 9999) - (zoneDistances[b.id] ?? 9999))[0];
 }
 
+function getFallbackDeliveryMethod(zones: DeliveryZone[]): DeliveryCalculationMethod {
+  if (zones.some((zone) => zone.type === "RADIUS" || zone.type === "RADIUS_OVERFLOW")) return "STRAIGHT_LINE";
+  return "NEIGHBORHOOD";
+}
+
+function filterZonesByMethod(zones: DeliveryZone[], method: DeliveryCalculationMethod) {
+  if (method === "NEIGHBORHOOD") {
+    return zones.filter((zone) => zone.type === "NEIGHBORHOOD");
+  }
+
+  return zones.filter((zone) => {
+    if (zone.type !== "RADIUS" && zone.type !== "RADIUS_OVERFLOW") return false;
+
+    return (zone.distanceMode ?? "STRAIGHT_LINE") === "STRAIGHT_LINE";
+  });
+}
+
 export function CustomerCart({ step }: { step: CheckoutStep }) {
   const navigate = useNavigate();
   const location = useLocation();
   const tenantSlug = getPublicTenantSlug(location.pathname) ?? DEFAULT_PUBLIC_TENANT_SLUG;
   const tenantPath = (path: string) => publicTenantPath(tenantSlug, path);
+  const { settings } = useTenant();
   const {
     items,
     address,
@@ -214,22 +186,43 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
   const [cartItemPendingDelete, setCartItemPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [zoneDistances, setZoneDistances] = useState<ZoneDistanceMap>({});
   const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
-  const { data: deliveryZones = [] } = useQuery({
+  const { data: deliveryZones = EMPTY_DELIVERY_ZONES, isLoading: isLoadingDeliveryZones } = useQuery({
     queryKey: ["public-delivery-zones", tenantSlug],
     queryFn: () => deliveryZonesService.listPublic(tenantSlug),
     staleTime: 60_000
   });
 
-  const missingAddress = useMemo(
-    () => !address.street || !address.number || !address.district || !address.postalCode,
-    [address.district, address.number, address.postalCode, address.street]
-  );
-
   const paymentLabel = payment.type === "PIX" ? "PIX" : payment.type === "CREDIT_CARD" ? "Cartao de credito" : "Dinheiro";
-  const selectedZone = useMemo(
-    () => findDeliveryZone(deliveryZones, address, subtotal, zoneDistances),
-    [address, deliveryZones, subtotal, zoneDistances]
+  const activeDeliveryMethod = settings.deliveryCalculationMethod ?? getFallbackDeliveryMethod(deliveryZones);
+  const deliveryZonesForMethod = useMemo(
+    () => filterZonesByMethod(deliveryZones, activeDeliveryMethod),
+    [activeDeliveryMethod, deliveryZones]
   );
+  const selectedZone = useMemo(
+    () => findDeliveryZone(deliveryZonesForMethod, address, subtotal, zoneDistances),
+    [address, deliveryZonesForMethod, subtotal, zoneDistances]
+  );
+  const manualNeighborhoods = useMemo(() => {
+    const neighborhoods = new Map<string, string>();
+
+    deliveryZonesForMethod
+      .filter((zone) => zone.status === "ACTIVE" && zone.type === "NEIGHBORHOOD" && zone.neighborhood?.trim())
+      .forEach((zone) => neighborhoods.set(normalizeZoneText(zone.neighborhood ?? ""), zone.neighborhood!.trim()));
+
+    return Array.from(neighborhoods.values()).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [deliveryZonesForMethod]);
+  const usesManualNeighborhoodDelivery = activeDeliveryMethod === "NEIGHBORHOOD";
+  const hasActiveDeliveryZones = deliveryZonesForMethod.some((zone) => zone.status === "ACTIVE");
+  const deliveryMethodUnavailable = fulfillment.type === "DELIVERY" && !isLoadingDeliveryZones && !hasActiveDeliveryZones;
+  const manualNeighborhoodDeliveryUnavailable =
+    fulfillment.type === "DELIVERY" && usesManualNeighborhoodDelivery && !isLoadingDeliveryZones && manualNeighborhoods.length === 0;
+  const isAddressLockedByNeighborhood = fulfillment.type === "DELIVERY" && usesManualNeighborhoodDelivery && !address.district;
+  const missingAddress = useMemo(() => {
+    if (fulfillment.type !== "DELIVERY") return false;
+
+    const baseMissing = !address.street || !address.number || !address.district;
+    return usesManualNeighborhoodDelivery ? baseMissing : baseMissing || !address.postalCode;
+  }, [address.district, address.number, address.postalCode, address.street, fulfillment.type, usesManualNeighborhoodDelivery]);
   const pageTitle =
     step === "cart" ? "Revise seu pedido" : step === "address" ? "Endereco de entrega" : step === "payment" ? "Pagamento" : "Pedido confirmado";
   const pageDescription =
@@ -274,12 +267,20 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
           return;
         }
 
+        const registeredNeighborhood = manualNeighborhoods.find(
+          (neighborhood) => normalizeZoneText(neighborhood) === normalizeZoneText(data.bairro ?? "")
+        );
+
         updateAddress({
           ...(data.logradouro ? { street: data.logradouro } : {}),
-          ...(data.bairro ? { district: data.bairro } : {}),
+          ...(usesManualNeighborhoodDelivery ? {} : data.bairro ? { district: data.bairro } : {}),
           ...(data.localidade ? { city: data.localidade } : {}),
           ...(data.uf ? { state: data.uf } : {})
         });
+
+        if (usesManualNeighborhoodDelivery && data.bairro && !registeredNeighborhood) {
+          setCepLookupError("O bairro deste CEP nao esta na area de entrega cadastrada.");
+        }
       })
       .catch((lookupError) => {
         if ((lookupError as Error).name !== "AbortError") {
@@ -291,10 +292,20 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       });
 
     return () => controller.abort();
-  }, [address.postalCode, updateAddress]);
+  }, [address.postalCode, manualNeighborhoods, updateAddress, usesManualNeighborhoodDelivery]);
 
   useEffect(() => {
-    const radiusZones = deliveryZones.filter(
+    if (
+      usesManualNeighborhoodDelivery &&
+      address.district &&
+      !manualNeighborhoods.some((neighborhood) => normalizeZoneText(neighborhood) === normalizeZoneText(address.district))
+    ) {
+      updateAddress({ district: "" });
+    }
+  }, [address.district, manualNeighborhoods, updateAddress, usesManualNeighborhoodDelivery]);
+
+  useEffect(() => {
+    const radiusZones = deliveryZonesForMethod.filter(
       (zone) => (zone.type === "RADIUS" || zone.type === "RADIUS_OVERFLOW") && zone.status === "ACTIVE" && zone.branch?.address
     );
     const hasCustomerAddress = Boolean(address.street && address.number && address.district && address.city && address.state);
@@ -333,12 +344,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
 
           if (branchPoint) {
             const straightLineDistance = distanceInKm(branchPoint, customerPoint);
-            const routeDistance =
-              (zone.distanceMode ?? "ROUTE") === "STRAIGHT_LINE"
-                ? null
-                : await routeDistanceInKm(branchPoint, customerPoint, controller.signal);
-            const deliveryDistance = routeDistance ?? straightLineDistance;
-            nextDistances[zone.id] = Number(deliveryDistance.toFixed(2));
+            nextDistances[zone.id] = Number(straightLineDistance.toFixed(2));
           }
         }
 
@@ -355,13 +361,18 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
     })();
 
     return () => controller.abort();
-  }, [address, deliveryZones, fulfillment.type]);
+  }, [address, deliveryZonesForMethod, fulfillment.type]);
 
   useEffect(() => {
     if (fulfillment.type === "PICKUP") {
       if (fulfillment.deliveryFee !== 0) {
         updateFulfillment({ deliveryFee: 0, zoneId: undefined, zoneName: undefined, estimatedMinutes: undefined });
       }
+      return;
+    }
+
+    if ((manualNeighborhoodDeliveryUnavailable || (usesManualNeighborhoodDelivery && !address.district)) && (fulfillment.deliveryFee !== 0 || fulfillment.zoneId)) {
+      updateFulfillment({ deliveryFee: 0, zoneId: undefined, zoneName: undefined, estimatedMinutes: undefined });
       return;
     }
 
@@ -384,7 +395,18 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
     if ((address.district || onlyDigits(address.postalCode).length >= 8) && (fulfillment.deliveryFee !== 0 || fulfillment.zoneId)) {
       updateFulfillment({ deliveryFee: 0, zoneId: undefined, zoneName: undefined, estimatedMinutes: undefined });
     }
-  }, [address.district, address.postalCode, fulfillment.deliveryFee, fulfillment.estimatedMinutes, fulfillment.type, fulfillment.zoneId, selectedZone, updateFulfillment]);
+  }, [
+    address.district,
+    address.postalCode,
+    fulfillment.deliveryFee,
+    fulfillment.estimatedMinutes,
+    fulfillment.type,
+    fulfillment.zoneId,
+    manualNeighborhoodDeliveryUnavailable,
+    selectedZone,
+    updateFulfillment,
+    usesManualNeighborhoodDelivery
+  ]);
 
   const nextStep = () => {
     setError(null);
@@ -407,9 +429,23 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
         return;
       }
 
+      if (deliveryMethodUnavailable || manualNeighborhoodDeliveryUnavailable) {
+        const message = usesManualNeighborhoodDelivery
+          ? "Esta loja ainda nao cadastrou bairros para entrega."
+          : "Esta loja ainda nao possui areas de entrega ativas.";
+        setError(message);
+        toast.warning(message);
+        return;
+      }
+
       if (fulfillment.type === "DELIVERY" && missingAddress) {
-        setError("Preencha rua, numero, bairro e CEP para continuar.");
-        toast.warning("Preencha rua, numero, bairro e CEP para continuar.");
+        const message = usesManualNeighborhoodDelivery && !address.district
+          ? "Selecione o bairro atendido antes de preencher o endereco."
+          : usesManualNeighborhoodDelivery
+            ? "Preencha rua, numero e bairro para continuar."
+            : "Preencha rua, numero, bairro e CEP para continuar.";
+        setError(message);
+        toast.warning(message);
         return;
       }
 
@@ -419,7 +455,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
         return;
       }
 
-      if (fulfillment.type === "DELIVERY" && deliveryZones.length > 0 && !selectedZone) {
+      if (fulfillment.type === "DELIVERY" && hasActiveDeliveryZones && !selectedZone) {
         setError("Este endereco ainda nao esta dentro de uma area de entrega ativa.");
         toast.warning("Este endereco ainda nao esta dentro de uma area de entrega ativa.");
         return;
@@ -447,9 +483,24 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       return;
     }
 
+    if (deliveryMethodUnavailable || manualNeighborhoodDeliveryUnavailable) {
+      const message = usesManualNeighborhoodDelivery
+        ? "Esta loja ainda nao cadastrou bairros para entrega."
+        : "Esta loja ainda nao possui areas de entrega ativas.";
+      setError(message);
+      toast.warning(message);
+      navigate(tenantPath("/carrinho/endereco"));
+      return;
+    }
+
     if (fulfillment.type === "DELIVERY" && missingAddress) {
-      setError("Preencha rua, numero, bairro e CEP para salvar o pedido.");
-      toast.warning("Preencha rua, numero, bairro e CEP para salvar o pedido.");
+      const message = usesManualNeighborhoodDelivery && !address.district
+        ? "Selecione o bairro atendido antes de salvar o pedido."
+        : usesManualNeighborhoodDelivery
+          ? "Preencha rua, numero e bairro para salvar o pedido."
+          : "Preencha rua, numero, bairro e CEP para salvar o pedido.";
+      setError(message);
+      toast.warning(message);
       navigate(tenantPath("/carrinho/endereco"));
       return;
     }
@@ -461,7 +512,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       return;
     }
 
-    if (fulfillment.type === "DELIVERY" && deliveryZones.length > 0 && !selectedZone) {
+    if (fulfillment.type === "DELIVERY" && hasActiveDeliveryZones && !selectedZone) {
       setError("Este endereco ainda nao esta dentro de uma area de entrega ativa.");
       toast.warning("Este endereco ainda nao esta dentro de uma area de entrega ativa.");
       navigate(tenantPath("/carrinho/endereco"));
@@ -482,8 +533,12 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       navigate(tenantPath("/carrinho/confirmacao"));
     } catch (orderError) {
       console.error(orderError);
-      setError("Nao conseguimos confirmar seu pedido agora. Tente novamente em instantes.");
-      toast.error("Nao conseguimos confirmar seu pedido agora.");
+      const orderMessage =
+        orderError instanceof Error && !orderError.message.startsWith("{")
+          ? orderError.message
+          : "Nao conseguimos confirmar seu pedido agora. Tente novamente em instantes.";
+      setError(orderMessage);
+      toast.error(orderMessage);
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -556,7 +611,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                 <div className="fulfillment-switch" role="group" aria-label="Forma de recebimento">
                   <button
                     className={fulfillment.type === "DELIVERY" ? "selected" : ""}
-                    onClick={() => updateFulfillment({ type: "DELIVERY", deliveryFee: selectedZone?.fee ?? (fulfillment.deliveryFee || 8) })}
+                    onClick={() => updateFulfillment({ type: "DELIVERY", deliveryFee: selectedZone?.fee ?? fulfillment.deliveryFee ?? 0 })}
                     type="button"
                   >
                     <Bike size={18} />
@@ -630,7 +685,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
             <div className="fulfillment-switch compact" role="group" aria-label="Forma de recebimento">
               <button
                 className={fulfillment.type === "DELIVERY" ? "selected" : ""}
-                onClick={() => updateFulfillment({ type: "DELIVERY", deliveryFee: selectedZone?.fee ?? 8 })}
+                onClick={() => updateFulfillment({ type: "DELIVERY", deliveryFee: selectedZone?.fee ?? 0 })}
                 type="button"
               >
                 <Bike size={18} />
@@ -668,16 +723,50 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
               </label>
               {fulfillment.type === "DELIVERY" ? (
                 <>
+                  {usesManualNeighborhoodDelivery ? (
+                    <div className="field neighborhood-select-field full-field">
+                      <span id="customer-neighborhood-label">Bairro atendido</span>
+                      <Select
+                        disabled={manualNeighborhoods.length === 0}
+                        value={address.district || undefined}
+                        onValueChange={(value) => {
+                          setCepLookupError(null);
+                          updateAddress({ district: value });
+                        }}
+                      >
+                        <SelectTrigger aria-labelledby="customer-neighborhood-label" disabled={manualNeighborhoods.length === 0}>
+                          <SelectValue placeholder={manualNeighborhoods.length === 0 ? "Nenhum bairro disponivel" : "Selecione seu bairro"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {manualNeighborhoods.map((neighborhood) => (
+                            <SelectItem key={neighborhood} value={neighborhood}>
+                              {neighborhood}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <small className={manualNeighborhoodDeliveryUnavailable ? "field-hint field-hint-error" : "field-hint"}>
+                        {manualNeighborhoodDeliveryUnavailable
+                          ? "A loja precisa cadastrar bairros ativos antes de receber pedidos para entrega."
+                          : "Escolha um bairro atendido para liberar o endereco."}
+                      </small>
+                    </div>
+                  ) : null}
                   <label className="field">
                     <span>CEP</span>
                     <div>
                       <MapPin size={18} />
                       <input
                         autoComplete="postal-code"
+                        disabled={isAddressLockedByNeighborhood}
                         inputMode="numeric"
                         value={address.postalCode}
-                        onChange={(event) => updateAddress({ postalCode: formatCep(event.target.value) })}
-                        placeholder="00000-000"
+                        onChange={(event) =>
+                          updateAddress({
+                            postalCode: formatCep(event.target.value)
+                          })
+                        }
+                        placeholder={isAddressLockedByNeighborhood ? "Escolha o bairro primeiro" : "00000-000"}
                       />
                     </div>
                     {isLookingUpCep ? <small className="field-hint">Buscando endereco...</small> : null}
@@ -687,7 +776,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                       <small className="field-hint">
                         Area {selectedZone.name}: {formatCurrency(selectedZone.fee)}
                         {(selectedZone.type === "RADIUS" || selectedZone.type === "RADIUS_OVERFLOW") && zoneDistances[selectedZone.id] !== undefined
-                          ? ` - ${zoneDistances[selectedZone.id].toFixed(2).replace(".", ",")} km ${deliveryDistanceLabel(selectedZone)}`
+                          ? ` - ${zoneDistances[selectedZone.id].toFixed(2).replace(".", ",")} km ${deliveryDistanceLabel()}`
                           : ""}
                       </small>
                     ) : null}
@@ -696,14 +785,14 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                     <span>Rua</span>
                     <div>
                       <Bike size={18} />
-                      <input value={address.street} onChange={(event) => updateAddress({ street: event.target.value })} placeholder="Rua" />
+                      <input disabled={isAddressLockedByNeighborhood} value={address.street} onChange={(event) => updateAddress({ street: event.target.value })} placeholder="Rua" />
                     </div>
                   </label>
                   <label className="field">
                     <span>Numero</span>
                     <div>
                       <Bike size={18} />
-                      <input value={address.number} onChange={(event) => updateAddress({ number: event.target.value })} placeholder="123" />
+                      <input disabled={isAddressLockedByNeighborhood} value={address.number} onChange={(event) => updateAddress({ number: event.target.value })} placeholder="123" />
                     </div>
                   </label>
                   <label className="field">
@@ -711,24 +800,28 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                     <div>
                       <Bike size={18} />
                       <input
+                        disabled={isAddressLockedByNeighborhood}
                         value={address.complement}
                         onChange={(event) => updateAddress({ complement: event.target.value })}
                         placeholder="Apto, bloco"
                       />
                     </div>
                   </label>
-                  <label className="field">
-                    <span>Bairro</span>
-                    <div>
-                      <Bike size={18} />
-                      <input value={address.district} onChange={(event) => updateAddress({ district: event.target.value })} placeholder="Bairro" />
-                    </div>
-                  </label>
+                  {!usesManualNeighborhoodDelivery ? (
+                    <label className="field">
+                      <span>Bairro</span>
+                      <div>
+                        <Bike size={18} />
+                        <input value={address.district} onChange={(event) => updateAddress({ district: event.target.value })} placeholder="Bairro" />
+                      </div>
+                    </label>
+                  ) : null}
                   <label className="field">
                     <span>Referencia</span>
                     <div>
                       <Bike size={18} />
                       <input
+                        disabled={isAddressLockedByNeighborhood}
                         value={address.reference}
                         onChange={(event) => updateAddress({ reference: event.target.value })}
                         placeholder="Ponto de referencia"

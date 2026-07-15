@@ -259,6 +259,17 @@ const getWahaStatus = (error: unknown) =>
     ? Number((error.details as { wahaStatus?: unknown }).wahaStatus)
     : undefined;
 
+const getWahaReportedStatus = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+
+  try {
+    const parsed = JSON.parse(message) as Record<string, unknown>;
+    return asString(parsed.status);
+  } catch {
+    return message.match(/"status"\s*:\s*"([^"]+)"/)?.[1] ?? message.match(/\b(WORKING|CONNECTED|AUTHENTICATED|STARTING|SCAN_QR_CODE|FAILED|ERROR|STOPPED|DISCONNECTED)\b/)?.[1];
+  }
+};
+
 const triggerForOrderStatus = (status: OrderStatus): WhatsappTemplateTrigger | null => {
   const triggers: Partial<Record<OrderStatus, WhatsappTemplateTrigger>> = {
     PLACED: "ORDER_PLACED",
@@ -567,6 +578,24 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   try {
     return await refreshSessionQr(tenantId);
   } catch (error) {
+    const reportedStatus = getWahaReportedStatus(error);
+
+    if (getWahaStatus(error) === 422 && reportedStatus) {
+      const normalizedStatus = normalizeWahaStatus(reportedStatus);
+      const updated = await prisma.whatsappSession.update({
+        where: { id: session.id },
+        data: {
+          status: normalizedStatus,
+          qrCode: normalizedStatus === "CONNECTED" ? null : session.qrCode,
+          lastStatusAt: new Date(),
+          lastError: null
+        }
+      });
+
+      emitSessionUpdate(updated);
+      return mapSession(updated);
+    }
+
     const updated = await prisma.whatsappSession.update({
       where: { id: session.id },
       data: {
@@ -610,9 +639,32 @@ export const refreshSessionQr = async (tenantId: string): Promise<ReturnType<typ
     response = await wahaQrRequest(qrPath);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    const reportedStatus = getWahaReportedStatus(error);
+    const normalizedStatus = reportedStatus ? normalizeWahaStatus(reportedStatus) : null;
+
+    if (normalizedStatus === "CONNECTED") {
+      const connected = await updateSessionFromWahaStatus(session, "CONNECTED", { lastError: null });
+
+      return mapSession(connected);
+    }
+
+    if (getWahaStatus(error) === 422 && normalizedStatus === "PENDING_QR") {
+      const updated = await prisma.whatsappSession.update({
+        where: { id: syncedSession.id },
+        data: {
+          status: "PENDING_QR",
+          qrCode: null,
+          lastStatusAt: new Date(),
+          lastError: null
+        }
+      });
+
+      emitSessionUpdate(updated);
+      return mapSession(updated);
+    }
 
     if (message.includes("Session status is not as expected") || message.includes('"status":"WORKING"')) {
-      const connected = await updateSessionFromWahaStatus(session, "CONNECTED");
+      const connected = await updateSessionFromWahaStatus(session, "CONNECTED", { lastError: null });
 
       return mapSession(connected);
     }
@@ -773,8 +825,38 @@ export const sendTextMessage = async (tenantId: string, phone: string, text: str
     throw new AppError("WhatsApp session not found", 404);
   }
 
+  const wahaSession = await wahaRequest<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(session.sessionName)}`, { timeoutMs: 5_000 }).catch(async (error) => {
+    const message = getWahaErrorMessage(error);
+    await prisma.whatsappSession.update({
+      where: { id: session.id },
+      data: { lastError: message, lastStatusAt: new Date() }
+    });
+    throw error;
+  });
+  const rawWahaStatus = asString(wahaSession.status);
+  const normalizedWahaStatus = normalizeWahaStatus(rawWahaStatus);
+
+  if (normalizedWahaStatus !== "CONNECTED") {
+    const message = `WhatsApp session is not ready to send messages. WAHA status: ${rawWahaStatus ?? "unknown"}`;
+    const updated = await prisma.whatsappSession.update({
+      where: { id: session.id },
+      data: {
+        status: normalizedWahaStatus,
+        qrCode: session.qrCode,
+        lastError: message,
+        lastStatusAt: new Date()
+      }
+    });
+
+    emitSessionUpdate(updated);
+    throw new AppError(message, 409, {
+      code: "WAHA_SESSION_NOT_READY",
+      wahaStatus: rawWahaStatus ?? null
+    });
+  }
+
   if (session.status !== "CONNECTED") {
-    throw new AppError("WhatsApp session is not connected", 409);
+    await updateSessionFromWahaStatus(session, "CONNECTED", { lastError: null });
   }
 
   const chatId = toChatId(phone);

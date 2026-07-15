@@ -159,6 +159,13 @@ enum DeliveryDistanceMode {
   STRAIGHT_LINE
 }
 
+enum DeliveryCalculationMethod {
+  NEIGHBORHOOD
+  POSTAL_CODE
+  ROUTE
+  STRAIGHT_LINE
+}
+
 enum NoteVisibility {
   INTERNAL
   CUSTOMER
@@ -229,6 +236,7 @@ model TenantSettings {
   autoAcceptOrders       Boolean  @default(false)
   defaultPreparationTime Int      @default(30)
   minimumOrderValue      Decimal  @default(0) @db.Decimal(12, 2)
+  deliveryCalculationMethod DeliveryCalculationMethod @default(NEIGHBORHOOD)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }
@@ -419,6 +427,7 @@ model DeliveryZone {
   postalCodeEnd     String?
   radiusKm          Decimal?         @db.Decimal(8, 2)
   distanceMode      DeliveryDistanceMode @default(ROUTE)
+  color             String?
   fee               Decimal          @default(0) @db.Decimal(12, 2)
   minimumOrderValue Decimal          @default(0) @db.Decimal(12, 2)
   estimatedMinutes  Int?

@@ -23,6 +23,7 @@ export type PublicOrderPayload = {
   customerEmail?: string;
   notes?: string;
   deliveryFee?: number;
+  deliveryZoneId?: string;
   deliveryAddress?: {
     street: string;
     number: string;
@@ -94,7 +95,10 @@ export const ordersService = {
     });
 
     if (!response.ok) {
-      const message = await response.text();
+      const contentType = response.headers.get("content-type") ?? "";
+      const message = contentType.includes("application/json")
+        ? ((await response.json()) as { message?: string; error?: string }).message ?? "Nao foi possivel criar o pedido."
+        : await response.text();
       throw new Error(message || `Order create error ${response.status}`);
     }
 

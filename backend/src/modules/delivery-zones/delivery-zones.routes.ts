@@ -7,6 +7,7 @@ import {
   createDeliveryZoneSchema,
   deleteDeliveryZoneSchema,
   publicDeliveryZonesSchema,
+  updateDeliveryCalculationMethodSchema,
   updateDeliveryZoneSchema
 } from "./delivery-zones.schemas.js";
 
@@ -15,6 +16,7 @@ export const publicDeliveryZonesRoutes = Router();
 
 deliveryZonesRoutes.use(authMiddleware, tenantMiddleware);
 deliveryZonesRoutes.get("/", requirePermission("tenant.branches.read"), controller.list);
+deliveryZonesRoutes.patch("/calculation-method", requirePermission("tenant.branches.write"), validate(updateDeliveryCalculationMethodSchema), controller.updateCalculationMethod);
 deliveryZonesRoutes.post("/", requirePermission("tenant.branches.write"), validate(createDeliveryZoneSchema), controller.create);
 deliveryZonesRoutes.patch("/:id", requirePermission("tenant.branches.write"), validate(updateDeliveryZoneSchema), controller.update);
 deliveryZonesRoutes.delete("/:id", requirePermission("tenant.branches.write"), validate(deleteDeliveryZoneSchema), controller.remove);
