@@ -1,0 +1,22 @@
+.ui-textarea {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  display: block;
+  font: inherit;
+  line-height: 1.45;
+  min-height: 96px;
+  padding: 12px;
+  resize: vertical;
+  width: 100%;
+}
+
+.ui-textarea:focus-visible {
+  border-color: var(--brand);
+  outline: 3px solid color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+.ui-textarea::placeholder {
+  color: var(--muted);
+}

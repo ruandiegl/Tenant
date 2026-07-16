@@ -8,7 +8,7 @@ export const listKitchenOrders = (tenantId: string, branchId?: string, status?: 
   return prisma.kitchenTicket.findMany({
     where: { tenantId, branchId, status },
     include: {
-      order: { include: { items: { include: { options: true } } } },
+      order: { include: { items: { include: { options: true, removedIngredients: true } } } },
       branch: true
     },
     orderBy: [{ priority: "desc" }, { queuedAt: "asc" }]

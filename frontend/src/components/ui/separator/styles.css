@@ -1,0 +1,6 @@
+.ui-separator {
+  background: var(--line);
+  flex: 0 0 1px;
+  height: 1px;
+  width: 100%;
+}

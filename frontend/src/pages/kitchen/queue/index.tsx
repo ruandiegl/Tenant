@@ -235,7 +235,12 @@ function KitchenOrderCard({
                 <span>
                   {item.productNameSnapshot}
                   {item.options.length > 0 ? ` + ${item.options.map((option) => option.optionNameSnapshot).join(", ")}` : ""}
-                  {item.notes ? ` - ${item.notes}` : ""}
+                  {(item.removedIngredients ?? []).length > 0 ? (
+                    <small className="kitchen-removed-ingredients">
+                      Sem: {(item.removedIngredients ?? []).map((ingredient) => ingredient.ingredientNameSnapshot).join(", ")}
+                    </small>
+                  ) : null}
+                  {item.notes ? <small>Obs: {item.notes}</small> : null}
                 </span>
               </li>
             ))}
@@ -344,6 +349,11 @@ function OrderDetailsModal({
                     ) : (
                       <p className="muted-text">Ingredientes/complementos: sem adicionais selecionados.</p>
                     )}
+                    {(item.removedIngredients ?? []).length > 0 ? (
+                      <p className="kitchen-removed-ingredients">
+                        Sem: {(item.removedIngredients ?? []).map((ingredient) => ingredient.ingredientNameSnapshot).join(", ")}
+                      </p>
+                    ) : null}
                     {item.notes ? <p className="muted-text">Observacao: {item.notes}</p> : null}
                   </article>
                 ))}

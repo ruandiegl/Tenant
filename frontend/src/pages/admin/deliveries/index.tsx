@@ -1,6 +1,6 @@
 import "./styles.css";
-import { FormEvent, useEffect, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { CSSProperties, FormEvent, PointerEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, MapPinned, Pencil, Pipette, Plus, Power, Trash2, X } from "lucide-react";
 import { toast } from "react-toastify";
@@ -324,7 +324,6 @@ function buildOsmRadiusMap(point: GeoPoint, largestRadiusKm: number, size: MapSi
 }
 
 function StaticRadiusMap({ point, overlays }: { point: GeoPoint; overlays: RadiusMapOverlay[] }) {
-  const mapRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<MapSize>(DEFAULT_MAP_SIZE);
   const [zoomStep, setZoomStep] = useState(0);
   const orderedOverlays = [...overlays]
@@ -334,13 +333,19 @@ function StaticRadiusMap({ point, overlays }: { point: GeoPoint; overlays: Radiu
   const zoomScale = Math.pow(MAP_ZOOM_STEP_SCALE, zoomStep);
   const radiusMap = buildOsmRadiusMap(point, largestRadiusKm, size, zoomScale);
 
-  useEffect(() => {
-    const element = mapRef.current;
-    if (!element) return;
+  const observeMapSize = useCallback((element: HTMLDivElement | null) => {
+    if (!element) return undefined;
 
     const updateSize = () => {
       const rect = element.getBoundingClientRect();
-      setSize({ width: rect.width || DEFAULT_MAP_SIZE.width, height: rect.height || DEFAULT_MAP_SIZE.height });
+      const nextSize = {
+        width: rect.width || DEFAULT_MAP_SIZE.width,
+        height: rect.height || DEFAULT_MAP_SIZE.height
+      };
+
+      setSize((current) =>
+        current.width === nextSize.width && current.height === nextSize.height ? current : nextSize
+      );
     };
 
     updateSize();
@@ -351,7 +356,7 @@ function StaticRadiusMap({ point, overlays }: { point: GeoPoint; overlays: Radiu
   }, []);
 
   return (
-    <div className="static-radius-map" ref={mapRef}>
+    <div className="static-radius-map" ref={observeMapSize}>
       <iframe aria-hidden="true" src={radiusMap.url} tabIndex={-1} title="Mapa da area de entrega" />
       <div className="real-map-zoom-controls" aria-label="Zoom do mapa">
         <button
@@ -838,18 +843,20 @@ export function AdminDeliveries() {
     ? `${selectedBranch.address.street}, ${selectedBranch.address.number}, ${selectedBranch.address.district}, ${selectedBranch.address.city}, ${selectedBranch.address.state}`
     : `${settings.brandName}, ${tenant.slug}`;
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
+  const selectedBranchAddress = selectedBranch?.address;
+  const branchGeocodeQuery = selectedBranchAddress ? branchAddressQuery(selectedBranchAddress) : "";
+  const branchLatitude = selectedBranchAddress?.latitude;
+  const branchLongitude = selectedBranchAddress?.longitude;
 
   useEffect(() => {
-    const address = selectedBranch?.address;
-
-    if (!address) {
+    if (!branchGeocodeQuery) {
       setMapPoint(null);
       setIsMapLoading(false);
       return;
     }
 
-    if (address.latitude !== undefined && address.longitude !== undefined && address.latitude !== null && address.longitude !== null) {
-      setMapPoint({ lat: Number(address.latitude), lng: Number(address.longitude) });
+    if (branchLatitude !== undefined && branchLongitude !== undefined && branchLatitude !== null && branchLongitude !== null) {
+      setMapPoint({ lat: Number(branchLatitude), lng: Number(branchLongitude) });
       setIsMapLoading(false);
       return;
     }
@@ -857,7 +864,7 @@ export function AdminDeliveries() {
     const controller = new AbortController();
     setIsMapLoading(true);
 
-    void geocodeMapAddress(branchAddressQuery(address), controller.signal)
+    void geocodeMapAddress(branchGeocodeQuery, controller.signal)
       .then((point) => {
         if (!controller.signal.aborted) {
           setMapPoint(point);
@@ -875,7 +882,7 @@ export function AdminDeliveries() {
       });
 
     return () => controller.abort();
-  }, [selectedBranch]);
+  }, [branchGeocodeQuery, branchLatitude, branchLongitude]);
 
   const renderMapPreview = (overlays: RadiusMapOverlay[], compact = false) => (
     <div className={compact ? "delivery-map-preview real-map-preview compact" : "delivery-map-preview real-map-preview"}>

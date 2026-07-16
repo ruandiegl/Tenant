@@ -638,6 +638,11 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                       {item.options.length > 0 ? (
                         <small className="muted-text">{item.options.map((option) => option.optionName).join(", ")}</small>
                       ) : null}
+                      {(item.removedIngredients ?? []).length > 0 ? (
+                        <small className="cart-removed-ingredients">
+                          Sem: {(item.removedIngredients ?? []).map((ingredient) => ingredient.name).join(", ")}
+                        </small>
+                      ) : null}
                       <textarea
                         aria-label={`Observacoes para ${item.productName}`}
                         onChange={(event) => updateItemNotes(item.id, event.target.value)}

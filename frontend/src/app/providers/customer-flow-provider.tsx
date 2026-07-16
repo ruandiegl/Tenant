@@ -12,6 +12,11 @@ export type CustomerSelectedOption = {
   unitPrice: number;
 };
 
+export type CustomerRemovedIngredient = {
+  optionItemId: string;
+  name: string;
+};
+
 export type CustomerCartItem = {
   id: string;
   productId: string;
@@ -20,6 +25,7 @@ export type CustomerCartItem = {
   quantity: number;
   unitPrice: number;
   options: CustomerSelectedOption[];
+  removedIngredients: CustomerRemovedIngredient[];
   notes: string;
 };
 
@@ -79,7 +85,12 @@ type CustomerFlowContextValue = {
   deliveryFee: number;
   discountTotal: number;
   total: number;
-  addProduct: (product: Product, options?: CustomerSelectedOption[], notes?: string) => void;
+  addProduct: (
+    product: Product,
+    options?: CustomerSelectedOption[],
+    notes?: string,
+    removedIngredients?: CustomerRemovedIngredient[]
+  ) => void;
   incrementItem: (itemId: string) => void;
   decrementItem: (itemId: string) => void;
   removeItem: (itemId: string) => void;
@@ -125,7 +136,7 @@ const emptyProfile: CustomerProfileDraft = {
 };
 
 const CustomerFlowContext = createContext<CustomerFlowContextValue | null>(null);
-const ORDER_RETENTION_MS = 48 * 60 * 60 * 1000;
+const ORDER_RETENTION_MS = 12 * 60 * 60 * 1000;
 
 type StoredCustomerFlow = {
   items?: CustomerCartItem[];
@@ -187,7 +198,12 @@ function writeStoredFlow(tenantSlug: string, flow: StoredCustomerFlow) {
   }
 }
 
-function createCartItem(product: Product, options: CustomerSelectedOption[] = [], notes = ""): CustomerCartItem {
+function createCartItem(
+  product: Product,
+  options: CustomerSelectedOption[] = [],
+  notes = "",
+  removedIngredients: CustomerRemovedIngredient[] = []
+): CustomerCartItem {
   const optionsTotal = options.reduce((sum, option) => sum + option.unitPrice * option.quantity, 0);
 
   return {
@@ -198,6 +214,7 @@ function createCartItem(product: Product, options: CustomerSelectedOption[] = []
     quantity: 1,
     unitPrice: (product.promotionalPrice ?? product.basePrice) + optionsTotal,
     options,
+    removedIngredients,
     notes
   };
 }
@@ -281,14 +298,16 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
       order,
       recentOrders,
       ...totals,
-      addProduct: (product, options = [], notes = "") => {
+      addProduct: (product, options = [], notes = "", removedIngredients = []) => {
         setOrder(null);
         setItems((current) => {
           const optionKey = options.map((option) => option.optionItemId).sort().join("|");
+          const removedIngredientKey = removedIngredients.map((ingredient) => ingredient.optionItemId).sort().join("|");
           const existing = current.find(
             (item) =>
               item.productId === product.id &&
               item.notes === notes &&
+              (item.removedIngredients ?? []).map((ingredient) => ingredient.optionItemId).sort().join("|") === removedIngredientKey &&
               item.options.map((option) => option.optionItemId).sort().join("|") === optionKey
           );
 
@@ -296,7 +315,7 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
             return current.map((item) => (item.id === existing.id ? { ...item, quantity: item.quantity + 1 } : item));
           }
 
-          return [...current, createCartItem(product, options, notes)];
+          return [...current, createCartItem(product, options, notes, removedIngredients)];
         });
       },
       incrementItem: (itemId) => {
@@ -357,6 +376,9 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
               options: item.options.map((option) => ({
                 optionItemId: option.optionItemId,
                 quantity: option.quantity
+              })),
+              removedIngredients: (item.removedIngredients ?? []).map((ingredient) => ({
+                optionItemId: ingredient.optionItemId
               }))
             }))
           },

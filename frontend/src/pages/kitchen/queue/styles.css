@@ -29,6 +29,17 @@
   color: var(--muted);
 }
 
+.item-list span > small {
+  display: block;
+  margin-top: 4px;
+}
+
+.kitchen-removed-ingredients {
+  color: var(--danger);
+  font-weight: 700;
+  margin: 0;
+}
+
 .kitchen-board {
   display: grid;
   gap: 12px;

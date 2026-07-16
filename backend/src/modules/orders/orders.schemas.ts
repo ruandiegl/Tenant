@@ -11,6 +11,14 @@ const orderItemSchema = z.object({
         quantity: z.number().int().positive().default(1)
       })
     )
+    .optional(),
+  removedIngredients: z
+    .array(
+      z.object({
+        optionItemId: z.string().min(1)
+      })
+    )
+    .max(50)
     .optional()
 });
 

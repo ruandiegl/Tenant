@@ -39,6 +39,7 @@ export type PublicOrderPayload = {
     quantity: number;
     notes?: string;
     options?: Array<{ optionItemId: string; quantity: number }>;
+    removedIngredients?: Array<{ optionItemId: string }>;
   }>;
 };
 
@@ -64,6 +65,10 @@ function mapOrder(order: BackendOrder): Order {
         optionItemId: option.optionItemId ?? "",
         unitPrice: Number(option.unitPrice),
         totalPrice: Number(option.totalPrice)
+      })),
+      removedIngredients: (item.removedIngredients ?? []).map((ingredient) => ({
+        ...ingredient,
+        optionItemId: ingredient.optionItemId ?? ""
       }))
     })),
     history: order.histories ?? order.history ?? []

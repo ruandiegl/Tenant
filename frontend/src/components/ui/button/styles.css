@@ -1,0 +1,52 @@
+.ui-button {
+  align-items: center;
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: var(--font-customer);
+  font-size: 0.92rem;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.ui-button:hover {
+  filter: brightness(0.96);
+}
+
+.ui-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.ui-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ui-button-outline {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.ui-button-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text);
+}
+
+.ui-button-icon {
+  min-width: 44px;
+  padding: 0;
+}
+
+.ui-button svg[data-icon] {
+  height: 18px;
+  width: 18px;
+}

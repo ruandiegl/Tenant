@@ -350,6 +350,14 @@ export type OrderItem = BaseEntity & {
   totalPrice: number;
   notes?: string;
   options: OrderItemOption[];
+  removedIngredients?: OrderItemRemovedIngredient[];
+};
+
+export type OrderItemRemovedIngredient = BaseEntity & {
+  tenantId: string;
+  orderItemId: string;
+  optionItemId?: string | null;
+  ingredientNameSnapshot: string;
 };
 
 export type OrderItemOption = BaseEntity & {

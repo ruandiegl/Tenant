@@ -23,15 +23,16 @@
 
 1. Cliente acessa `/:tenantSlug/menu`.
 2. Frontend carrega tenant, cardapio e delivery zones publicas.
-3. Cliente monta carrinho.
-4. Cliente informa endereco, contato e pagamento selecionado.
-5. Frontend chama `POST /public/:tenantSlug/orders`.
-6. Backend valida tenant, filial, produtos, opcoes e entrega.
-7. Backend calcula totais.
-8. Backend cria pedido, itens, historico e ticket de cozinha.
-9. Backend baixa estoque quando aplicavel.
-10. Backend emite eventos.
-11. Cliente recebe codigo publico.
+3. Cliente monta carrinho e personaliza produtos em um bottom sheet mobile.
+4. Ingredientes retirados sao mantidos separadamente de complementos e observacoes.
+5. Cliente informa endereco, contato e pagamento selecionado.
+6. Frontend chama `POST /public/:tenantSlug/orders`.
+7. Backend valida tenant, filial, produtos, opcoes, ingredientes retirados e entrega.
+8. Backend calcula totais sem alterar o preco por retirada de ingrediente.
+9. Backend cria pedido, itens, retiradas, historico e ticket de cozinha.
+10. Backend baixa estoque quando aplicavel.
+11. Backend emite eventos.
+12. Cliente recebe codigo publico.
 
 ## Acompanhamento de pedido
 
@@ -48,6 +49,7 @@
 4. Frontend chama `PATCH /tenant/kitchen/orders/:id/status`.
 5. Backend atualiza ticket e pedido.
 6. Backend emite evento para cozinha e pedido.
+7. Cards e detalhes exibem retiradas no formato `Sem: ingrediente`, separadas das observacoes.
 
 ## Admin cardapio
 
@@ -83,4 +85,3 @@
 2. Frontend exige `platformOnly`.
 3. Backend exige `requirePlatformAdmin`.
 4. Superadmin lista tenants, edita plano/status, cria planos e consulta auditoria.
-

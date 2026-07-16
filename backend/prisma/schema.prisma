@@ -186,94 +186,94 @@ model Plan {
 }
 
 model Tenant {
-  id        String          @id @default(cuid())
-  name      String
-  slug      String          @unique
-  legalName String?
-  document  String?         @unique
-  email     String?
-  phone     String?
-  status    TenantStatus    @default(TRIAL)
-  planId    String?
-  plan      Plan?           @relation(fields: [planId], references: [id])
-  settings  TenantSettings?
-  invites   TenantInvite[]
-  users     TenantUser[]
-  roles     Role[]
-  branches  Branch[]
-  customers Customer[]
-  whatsappSession WhatsappSession?
+  id               String            @id @default(cuid())
+  name             String
+  slug             String            @unique
+  legalName        String?
+  document         String?           @unique
+  email            String?
+  phone            String?
+  status           TenantStatus      @default(TRIAL)
+  planId           String?
+  plan             Plan?             @relation(fields: [planId], references: [id])
+  settings         TenantSettings?
+  invites          TenantInvite[]
+  users            TenantUser[]
+  roles            Role[]
+  branches         Branch[]
+  customers        Customer[]
+  whatsappSession  WhatsappSession?
   productTemplates ProductTemplate[]
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  deletedAt DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
 
   @@index([status])
 }
 
 model TenantSettings {
-  id                     String   @id @default(cuid())
-  tenantId               String   @unique
-  tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  brandName              String?
-  legalName              String?
-  description            String?
-  slogan                 String?
-  businessType           String?
-  cuisineCategory        String?
-  websiteUrl             String?
-  instagramUrl           String?
-  whatsapp               String?
-  logoUrl                String?
-  coverImageUrl          String?
-  primaryColor           String?
-  secondaryColor         String?
-  themeFontFamily        String?
-  welcomeMessage         String?
-  timezone               String   @default("America/Sao_Paulo")
-  currency               String   @default("BRL")
-  allowGuestCheckout     Boolean  @default(true)
-  autoAcceptOrders       Boolean  @default(false)
-  defaultPreparationTime Int      @default(30)
-  minimumOrderValue      Decimal  @default(0) @db.Decimal(12, 2)
+  id                        String                    @id @default(cuid())
+  tenantId                  String                    @unique
+  tenant                    Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  brandName                 String?
+  legalName                 String?
+  description               String?
+  slogan                    String?
+  businessType              String?
+  cuisineCategory           String?
+  websiteUrl                String?
+  instagramUrl              String?
+  whatsapp                  String?
+  logoUrl                   String?
+  coverImageUrl             String?
+  primaryColor              String?
+  secondaryColor            String?
+  themeFontFamily           String?
+  welcomeMessage            String?
+  timezone                  String                    @default("America/Sao_Paulo")
+  currency                  String                    @default("BRL")
+  allowGuestCheckout        Boolean                   @default(true)
+  autoAcceptOrders          Boolean                   @default(false)
+  defaultPreparationTime    Int                       @default(30)
+  minimumOrderValue         Decimal                   @default(0) @db.Decimal(12, 2)
   deliveryCalculationMethod DeliveryCalculationMethod @default(NEIGHBORHOOD)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
 }
 
 model TenantInvite {
-  id              String     @id @default(cuid())
+  id              String    @id @default(cuid())
   tenantId        String
-  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   email           String
   role            String
-  tokenHash       String     @unique
+  tokenHash       String    @unique
   expiresAt       DateTime
   acceptedAt      DateTime?
   createdByUserId String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([tenantId, email])
   @@index([tokenHash])
 }
 
 model User {
-  id             String        @id @default(cuid())
-  externalAuthId String?       @unique
-  name           String
-  email          String        @unique
-  passwordHash   String?
-  phone          String?
-  avatarUrl      String?
-  status         UserStatus    @default(ACTIVE)
-  isPlatformAdmin Boolean      @default(false)
-  lastLoginAt    DateTime?
-  tenantUsers    TenantUser[]
-  sessions       UserSession[]
-  auditLogs      AuditLog[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  externalAuthId  String?       @unique
+  name            String
+  email           String        @unique
+  passwordHash    String?
+  phone           String?
+  avatarUrl       String?
+  status          UserStatus    @default(ACTIVE)
+  isPlatformAdmin Boolean       @default(false)
+  lastLoginAt     DateTime?
+  tenantUsers     TenantUser[]
+  sessions        UserSession[]
+  auditLogs       AuditLog[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model TenantUser {
@@ -344,19 +344,19 @@ model UserSession {
 }
 
 model Branch {
-  id              String           @id @default(cuid())
+  id              String                @id @default(cuid())
   tenantId        String
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name            String
   slug            String
   email           String?
   phone           String?
-  status          BranchStatus     @default(ACTIVE)
+  status          BranchStatus          @default(ACTIVE)
   addressId       String?
-  address         Address?         @relation(fields: [addressId], references: [id])
-  acceptsDelivery Boolean          @default(true)
-  acceptsPickup   Boolean          @default(true)
-  acceptsDineIn   Boolean          @default(false)
+  address         Address?              @relation(fields: [addressId], references: [id])
+  acceptsDelivery Boolean               @default(true)
+  acceptsPickup   Boolean               @default(true)
+  acceptsDineIn   Boolean               @default(false)
   users           TenantUser[]
   businessHours   BusinessHour[]
   deliveryZones   DeliveryZone[]
@@ -367,8 +367,8 @@ model Branch {
   stations        KitchenStation[]
   paymentMethods  PaymentMethod[]
   carts           Cart[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
   deletedAt       DateTime?
 
   @@unique([tenantId, slug])
@@ -416,50 +416,50 @@ model BusinessHour {
 }
 
 model DeliveryZone {
-  id                String           @id @default(cuid())
+  id                String               @id @default(cuid())
   tenantId          String
   branchId          String
-  branch            Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch            Branch               @relation(fields: [branchId], references: [id], onDelete: Cascade)
   name              String
   type              DeliveryZoneType
   neighborhood      String?
   postalCodeStart   String?
   postalCodeEnd     String?
-  radiusKm          Decimal?         @db.Decimal(8, 2)
+  radiusKm          Decimal?             @db.Decimal(8, 2)
   distanceMode      DeliveryDistanceMode @default(ROUTE)
   color             String?
-  fee               Decimal          @default(0) @db.Decimal(12, 2)
-  minimumOrderValue Decimal          @default(0) @db.Decimal(12, 2)
+  fee               Decimal              @default(0) @db.Decimal(12, 2)
+  minimumOrderValue Decimal              @default(0) @db.Decimal(12, 2)
   estimatedMinutes  Int?
-  status            RecordStatus     @default(ACTIVE)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  status            RecordStatus         @default(ACTIVE)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   @@index([tenantId, branchId, status])
 }
 
 model Customer {
-  id             String                    @id @default(cuid())
-  tenantId       String
-  tenant         Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  externalAuthId String?
-  name           String
-  email          String?
-  phone          String?
-  document       String?
-  birthDate      DateTime?
-  status         UserStatus                @default(ACTIVE)
-  addresses      Address[]
-  customerLinks  CustomerAddress[]
-  favorites      CustomerFavoriteProduct[]
-  carts          Cart[]
-  orders         Order[]
-  couponUses     CouponRedemption[]
-  notifications  Notification[]
-  preferences    NotificationPreference[]
+  id                    String                    @id @default(cuid())
+  tenantId              String
+  tenant                Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalAuthId        String?
+  name                  String
+  email                 String?
+  phone                 String?
+  document              String?
+  birthDate             DateTime?
+  status                UserStatus                @default(ACTIVE)
+  addresses             Address[]
+  customerLinks         CustomerAddress[]
+  favorites             CustomerFavoriteProduct[]
+  carts                 Cart[]
+  orders                Order[]
+  couponUses            CouponRedemption[]
+  notifications         Notification[]
+  preferences           NotificationPreference[]
   whatsappConversations WhatsappConversation[]
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
 
   @@unique([tenantId, email])
   @@index([tenantId, phone])
@@ -491,20 +491,20 @@ model CustomerFavoriteProduct {
 }
 
 model MenuCategory {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   tenantId       String
   branchId       String?
-  branch         Branch?       @relation(fields: [branchId], references: [id])
+  branch         Branch?      @relation(fields: [branchId], references: [id])
   name           String
   description    String?
   imageUrl       String?
-  sortOrder      Int           @default(0)
-  status         RecordStatus  @default(ACTIVE)
+  sortOrder      Int          @default(0)
+  status         RecordStatus @default(ACTIVE)
   availableFrom  String?
   availableUntil String?
   products       Product[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
 
   @@index([tenantId, branchId, status])
@@ -574,19 +574,20 @@ model OptionGroup {
 }
 
 model OptionItem {
-  id              String            @id @default(cuid())
-  tenantId        String
-  optionGroupId   String
-  optionGroup     OptionGroup       @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
-  name            String
-  description     String?
-  price           Decimal           @default(0) @db.Decimal(12, 2)
-  status          RecordStatus      @default(ACTIVE)
-  sortOrder       Int               @default(0)
-  cartItemOptions CartItemOption[]
-  orderOptions    OrderItemOption[]
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                    String                       @id @default(cuid())
+  tenantId              String
+  optionGroupId         String
+  optionGroup           OptionGroup                  @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+  name                  String
+  description           String?
+  price                 Decimal                      @default(0) @db.Decimal(12, 2)
+  status                RecordStatus                 @default(ACTIVE)
+  sortOrder             Int                          @default(0)
+  cartItemOptions       CartItemOption[]
+  orderOptions          OrderItemOption[]
+  removedFromOrderItems OrderItemRemovedIngredient[]
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
 
   @@index([tenantId, optionGroupId, status])
 }
@@ -730,20 +731,21 @@ model Order {
 }
 
 model OrderItem {
-  id                  String              @id @default(cuid())
+  id                  String                       @id @default(cuid())
   tenantId            String
   orderId             String
-  order               Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order               Order                        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId           String?
-  product             Product?            @relation(fields: [productId], references: [id])
+  product             Product?                     @relation(fields: [productId], references: [id])
   productNameSnapshot String
   quantity            Int
-  unitPrice           Decimal             @db.Decimal(12, 2)
-  totalPrice          Decimal             @db.Decimal(12, 2)
+  unitPrice           Decimal                      @db.Decimal(12, 2)
+  totalPrice          Decimal                      @db.Decimal(12, 2)
   notes               String?
   options             OrderItemOption[]
+  removedIngredients  OrderItemRemovedIngredient[]
   kitchenItems        KitchenTicketItem[]
-  createdAt           DateTime            @default(now())
+  createdAt           DateTime                     @default(now())
 }
 
 model OrderItemOption {
@@ -757,6 +759,20 @@ model OrderItemOption {
   quantity           Int         @default(1)
   unitPrice          Decimal     @db.Decimal(12, 2)
   totalPrice         Decimal     @db.Decimal(12, 2)
+}
+
+model OrderItemRemovedIngredient {
+  id                     String      @id @default(cuid())
+  tenantId               String
+  orderItemId            String
+  orderItem              OrderItem   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  optionItemId           String?
+  optionItem             OptionItem? @relation(fields: [optionItemId], references: [id], onDelete: SetNull)
+  ingredientNameSnapshot String
+  createdAt              DateTime    @default(now())
+
+  @@index([tenantId, orderItemId])
+  @@index([optionItemId])
 }
 
 model OrderStatusHistory {
@@ -921,16 +937,16 @@ model Coupon {
 }
 
 model CouponRedemption {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   tenantId       String
   couponId       String
-  coupon         Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  coupon         Coupon    @relation(fields: [couponId], references: [id], onDelete: Cascade)
   customerId     String?
   customer       Customer? @relation(fields: [customerId], references: [id])
   orderId        String
-  order          Order    @relation(fields: [orderId], references: [id])
-  discountAmount Decimal  @db.Decimal(12, 2)
-  createdAt      DateTime @default(now())
+  order          Order     @relation(fields: [orderId], references: [id])
+  discountAmount Decimal   @db.Decimal(12, 2)
+  createdAt      DateTime  @default(now())
 
   @@index([tenantId, couponId])
 }
@@ -953,40 +969,40 @@ model Notification {
 }
 
 model NotificationPreference {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   tenantId   String
   userId     String?
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id])
   channel    String
-  enabled    Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  enabled    Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@unique([tenantId, userId, customerId, channel])
 }
 
 model WhatsappSession {
-  id                    String                @id @default(cuid())
-  tenantId              String                @unique
-  tenant                Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sessionName           String                @unique
-  phoneNumber           String?
-  displayName           String?
-  status                WhatsappSessionStatus @default(DISCONNECTED)
-  qrCode                String?               @db.Text
-  autoReplyEnabled      Boolean               @default(true)
-  notifyOrderStatus     Boolean               @default(true)
-  welcomeMessage        String?               @db.Text
-  lastStatusAt          DateTime?
-  connectedAt           DateTime?
-  disconnectedAt        DateTime?
-  lastError             String?
-  conversations         WhatsappConversation[]
-  messages              WhatsappMessage[]
-  templates             WhatsappMessageTemplate[]
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
+  id                String                    @id @default(cuid())
+  tenantId          String                    @unique
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessionName       String                    @unique
+  phoneNumber       String?
+  displayName       String?
+  status            WhatsappSessionStatus     @default(DISCONNECTED)
+  qrCode            String?                   @db.Text
+  autoReplyEnabled  Boolean                   @default(true)
+  notifyOrderStatus Boolean                   @default(true)
+  welcomeMessage    String?                   @db.Text
+  lastStatusAt      DateTime?
+  connectedAt       DateTime?
+  disconnectedAt    DateTime?
+  lastError         String?
+  conversations     WhatsappConversation[]
+  messages          WhatsappMessage[]
+  templates         WhatsappMessageTemplate[]
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
 
   @@index([tenantId, status])
 }
@@ -1025,29 +1041,29 @@ model WhatsappMessage {
   to             String?
   body           String?                  @db.Text
   messageType    String?
-    rawPayload     Json?
-    sentAt         DateTime?
-    receivedAt     DateTime?
-    deletedAt      DateTime?
-    createdAt      DateTime                 @default(now())
-  
-    @@unique([sessionId, externalId])
+  rawPayload     Json?
+  sentAt         DateTime?
+  receivedAt     DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime                 @default(now())
+
+  @@unique([sessionId, externalId])
   @@index([tenantId, chatId, createdAt])
   @@index([conversationId, createdAt])
 }
 
 model WhatsappMessageTemplate {
-  id          String                  @id @default(cuid())
-  tenantId    String
-  sessionId   String
-  session     WhatsappSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  trigger     WhatsappTemplateTrigger
-  title       String
-  body        String                  @db.Text
-  enabled     Boolean                 @default(true)
-  sortOrder   Int                     @default(0)
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  id        String                  @id @default(cuid())
+  tenantId  String
+  sessionId String
+  session   WhatsappSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  trigger   WhatsappTemplateTrigger
+  title     String
+  body      String                  @db.Text
+  enabled   Boolean                 @default(true)
+  sortOrder Int                     @default(0)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
 
   @@unique([sessionId, trigger])
   @@index([tenantId, trigger, enabled])

@@ -5,7 +5,7 @@ import { AppError } from "../../shared/errors/app-error.js";
 import { notifyOrderStatusChanged } from "../whatsapp/whatsapp.service.js";
 
 const publicCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
-const PUBLIC_ORDER_ACCESS_MS = 48 * 60 * 60 * 1000;
+const PUBLIC_ORDER_ACCESS_MS = 12 * 60 * 60 * 1000;
 
 type CreateOrderInput = {
   branchId: string;
@@ -32,6 +32,7 @@ type CreateOrderInput = {
     quantity: number;
     notes?: string;
     options?: Array<{ optionItemId: string; quantity: number }>;
+    removedIngredients?: Array<{ optionItemId: string }>;
   }>;
 };
 
@@ -191,17 +192,18 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
     throw new AppError("Delivery address is required for delivery orders", 400);
   }
 
+  const requestedProductIds = Array.from(new Set(data.items.map((item) => item.productId)));
   const products = await prisma.product.findMany({
     where: {
       tenantId: tenant.id,
-      id: { in: data.items.map((item) => item.productId) },
+      id: { in: requestedProductIds },
       status: "ACTIVE",
       deletedAt: null
     },
     include: { optionGroups: { include: { options: true } }, availability: { where: { branchId: data.branchId } } }
   });
 
-  if (products.length !== data.items.length) {
+  if (products.length !== requestedProductIds.length) {
     throw new AppError("One or more products are unavailable", 400);
   }
 
@@ -237,6 +239,23 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
         totalPrice
       };
     }) ?? [];
+    const ingredientGroup = product.optionGroups.find(
+      (group) => group.status === "ACTIVE" && normalizeZoneText(group.name) === "ingredientes"
+    );
+    const removedIngredients = Array.from(new Set(item.removedIngredients?.map((ingredient) => ingredient.optionItemId) ?? [])).map(
+      (optionItemId) => {
+        const ingredient = ingredientGroup?.options.find((option) => option.id === optionItemId);
+
+        if (!ingredient || ingredient.status !== "ACTIVE" || ingredient.tenantId !== tenant.id) {
+          throw new AppError(`Invalid removed ingredient for product ${product.name}`, 400);
+        }
+
+        return {
+          optionItemId: ingredient.id,
+          ingredientNameSnapshot: ingredient.name
+        };
+      }
+    );
     const itemOptionsTotal = options.reduce((sum, option) => sum.add(option.totalPrice), new Prisma.Decimal(0));
     const totalPrice = unitPrice.mul(item.quantity).add(itemOptionsTotal);
 
@@ -247,7 +266,8 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
       unitPrice,
       totalPrice,
       notes: item.notes,
-      options
+      options,
+      removedIngredients
     };
   });
 
@@ -379,6 +399,13 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
                 unitPrice: option.unitPrice,
                 totalPrice: option.totalPrice
               }))
+            },
+            removedIngredients: {
+              create: item.removedIngredients.map((ingredient) => ({
+                tenantId: tenant.id,
+                optionItemId: ingredient.optionItemId,
+                ingredientNameSnapshot: ingredient.ingredientNameSnapshot
+              }))
             }
           }))
         },
@@ -391,7 +418,7 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
           }
         }
       },
-      include: { items: { include: { options: true } }, deliveryAddress: true, kitchenTicket: true }
+      include: { items: { include: { options: true, removedIngredients: true } }, deliveryAddress: true, kitchenTicket: true }
     });
 
     await tx.kitchenTicket.create({
@@ -417,7 +444,7 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
 
     return tx.order.findUniqueOrThrow({
       where: { id: created.id },
-      include: { items: { include: { options: true } }, deliveryAddress: true, kitchenTicket: true }
+      include: { items: { include: { options: true, removedIngredients: true } }, deliveryAddress: true, kitchenTicket: true }
     });
   });
 
@@ -439,7 +466,7 @@ export const getPublicOrder = async (tenantSlug: string, publicCodeValue: string
       publicCode: publicCodeValue,
       createdAt: { gte: new Date(Date.now() - PUBLIC_ORDER_ACCESS_MS) }
     },
-    include: { items: { include: { options: true } }, deliveryAddress: true, histories: { orderBy: { createdAt: "asc" } } }
+    include: { items: { include: { options: true, removedIngredients: true } }, deliveryAddress: true, histories: { orderBy: { createdAt: "asc" } } }
   });
 
   if (!order) {
@@ -454,7 +481,7 @@ export const listTenantOrders = (tenantId: string, branchId?: string, status?: O
 
   return prisma.order.findMany({
     where: { tenantId, branchId, status, createdAt },
-    include: { items: { include: { options: true } }, kitchenTicket: true },
+    include: { items: { include: { options: true, removedIngredients: true } }, kitchenTicket: true },
     orderBy: { createdAt: "desc" }
   });
 };
@@ -462,7 +489,7 @@ export const listTenantOrders = (tenantId: string, branchId?: string, status?: O
 export const getTenantOrder = async (tenantId: string, id: string) => {
   const order = await prisma.order.findFirst({
     where: { tenantId, id },
-    include: { items: { include: { options: true } }, deliveryAddress: true, histories: true, kitchenTicket: true, payments: true }
+    include: { items: { include: { options: true, removedIngredients: true } }, deliveryAddress: true, histories: true, kitchenTicket: true, payments: true }
   });
 
   if (!order) {
@@ -493,7 +520,7 @@ export const updateOrderStatus = async (
         cancelReason: status === "CANCELLED" ? reason : undefined,
         ...statusDateField(status)
       },
-      include: { items: { include: { options: true } }, kitchenTicket: true }
+      include: { items: { include: { options: true, removedIngredients: true } }, kitchenTicket: true }
     });
 
     await tx.orderStatusHistory.create({

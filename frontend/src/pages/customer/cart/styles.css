@@ -155,6 +155,11 @@
   letter-spacing: 0;
 }
 
+.cart-removed-ingredients {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .cart-item-card textarea {
   background: var(--surface-strong);
   border: 1px solid var(--line);
