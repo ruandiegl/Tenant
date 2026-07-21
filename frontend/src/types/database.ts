@@ -338,6 +338,18 @@ export type Order = BaseEntity & {
   cancelReason?: string;
   items: OrderItem[];
   history: OrderStatusHistory[];
+  payment?: OrderPaymentSummary | null;
+};
+
+export type OrderPaymentSummary = {
+  status: PaymentStatus;
+  provider?: string | null;
+  providerPaymentId?: string | null;
+  paymentType?: string | null;
+  invoiceUrl?: string | null;
+  pixQrCode?: string | null;
+  pixCopyPaste?: string | null;
+  expiresAt?: string | null;
 };
 
 export type OrderItem = BaseEntity & {

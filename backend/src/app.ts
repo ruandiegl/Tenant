@@ -16,6 +16,7 @@ import { deliveryZonesRoutes, publicDeliveryZonesRoutes } from "./modules/delive
 import { kitchenRoutes } from "./modules/kitchen/kitchen.routes.js";
 import { tenantMenuRoutes, publicMenuRoutes } from "./modules/menu/menu.routes.js";
 import { tenantOrdersRoutes, publicOrdersRoutes } from "./modules/orders/orders.routes.js";
+import { publicPaymentsRoutes } from "./modules/payments/payments.routes.js";
 import { reportsRoutes } from "./modules/reports/reports.routes.js";
 import { publicTenantRoutes } from "./modules/tenants/tenants.routes.js";
 import { platformAuditRoutes, tenantManagementRoutes } from "./modules/tenant-management/tenant-management.routes.js";
@@ -62,6 +63,7 @@ app.use("/tenant/audit-logs", auditRoutes);
 app.use("/tenant/whatsapp", tenantWhatsappRoutes);
 app.use("/public", publicMenuRoutes);
 app.use("/public", publicOrdersRoutes);
+app.use("/public", publicPaymentsRoutes);
 app.use("/public", publicWhatsappRoutes);
 app.use("/public", publicDeliveryZonesRoutes);
 

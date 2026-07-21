@@ -1,16 +1,16 @@
 .period-filter {
-  --period-primary: #1e6b3c;
+  --period-primary: var(--brand);
   --period-dark: #12291e;
   --period-border: #c8ddd1;
-  display: grid;
-  gap: 10px;
+  min-width: 0;
 }
 
-.period-filter-row {
+.period-filter-row.ui-toggle-group {
   display: flex;
   gap: 8px;
+  max-width: 100%;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding: 2px 1px 4px;
   scrollbar-width: none;
 }
 
@@ -18,20 +18,21 @@
   display: none;
 }
 
-.period-chip {
+.period-chip.ui-toggle-group-item {
   align-items: center;
-  background: #ffffff;
+  background: var(--surface);
   border: 1px solid var(--period-border);
   border-radius: 999px;
   color: var(--text);
   display: inline-flex;
   flex: 0 0 auto;
   font: inherit;
+  font-size: 0.84rem;
   font-weight: 800;
   gap: 8px;
   height: 42px;
   overflow: hidden;
-  padding: 0 13px 0 10px;
+  padding: 0 13px 0 7px;
   transition:
     background 180ms ease,
     border-color 180ms ease,
@@ -40,39 +41,49 @@
   white-space: nowrap;
 }
 
-.period-chip.is-active {
+.period-chip:hover {
+  background: #f5faf6;
+}
+
+.period-chip[data-state="on"] {
   background: var(--period-dark);
   border-color: var(--period-dark);
-  color: white;
+  color: #fff;
   padding-right: 16px;
+}
+
+.period-chip:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--period-primary) 22%, transparent);
+  outline-offset: 2px;
 }
 
 .period-chip-icon {
   align-items: center;
   background: #eef6f0;
-  border-radius: 999px;
+  border-radius: 50%;
   color: var(--period-primary);
   display: inline-flex;
   height: 28px;
   justify-content: center;
-  transition:
-    background 180ms ease,
-    color 180ms ease,
-    transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1);
+  transition: background 180ms ease, color 180ms ease, transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1);
   width: 28px;
 }
 
-.period-chip.is-active .period-chip-icon {
+.period-chip-icon svg {
+  height: 15px;
+  width: 15px;
+}
+
+.period-chip[data-state="on"] .period-chip-icon {
   background: var(--period-primary);
-  color: #ffffff;
+  color: #fff;
   transform: scale(1.04);
 }
 
 .period-chip-context {
   color: #cfe9d9;
   display: inline-block;
-  font-size: 0.8rem;
-  font-weight: 800;
+  font-size: 0.76rem;
   max-width: 0;
   opacity: 0;
   overflow: hidden;
@@ -83,118 +94,109 @@
     transform 260ms cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 
-.period-chip.is-active .period-chip-context {
-  max-width: 160px;
+.period-chip[data-state="on"] .period-chip-context {
+  max-width: 190px;
   opacity: 1;
   transform: translateX(0);
 }
 
-.period-chip.is-active .period-chip-context::before {
-  color: rgba(255, 255, 255, 0.55);
-  content: "·";
+.period-chip[data-state="on"] .period-chip-context::before {
+  color: rgba(255, 255, 255, 0.52);
+  content: "\00b7";
   margin-right: 8px;
 }
 
-.custom-period-panel {
-  background: #ffffff;
-  border: 1px solid var(--period-border);
-  border-radius: 18px;
-  box-shadow: 0 18px 42px rgba(18, 41, 30, 0.1);
+.period-date-popover {
+  display: grid;
+  gap: 14px;
+}
+
+.period-date-popover-header {
+  align-items: center;
   display: grid;
   gap: 10px;
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  padding: 0 14px;
-  transform: translateY(-8px);
-  transition:
-    max-height 360ms cubic-bezier(0.34, 1.2, 0.64, 1),
-    opacity 180ms ease,
-    padding 320ms cubic-bezier(0.34, 1.2, 0.64, 1),
-    transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1);
+  grid-template-columns: 36px minmax(0, 1fr);
 }
 
-.custom-period-panel.is-open {
-  max-height: 260px;
-  opacity: 1;
-  padding: 14px;
-  transform: translateY(0);
-}
-
-.custom-period-panel p {
-  color: #597066;
-  font-size: 0.84rem;
-  font-weight: 800;
-  margin: 0;
-}
-
-.custom-period-nav {
+.period-date-popover-header > span {
   align-items: center;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
-
-.custom-period-nav strong {
-  color: var(--period-dark);
-  font-size: 0.92rem;
-  text-transform: capitalize;
-}
-
-.custom-period-nav button {
-  align-items: center;
-  background: #edf6ef;
-  border-radius: 999px;
-  color: var(--period-primary);
+  background: var(--surface-strong);
+  border-radius: 8px;
+  color: var(--brand);
   display: inline-flex;
-  height: 32px;
+  height: 36px;
   justify-content: center;
-  width: 32px;
+  width: 36px;
+}
+
+.period-date-popover-header svg {
+  height: 18px;
+  width: 18px;
+}
+
+.period-date-popover-header strong,
+.period-date-popover-header small {
+  display: block;
+}
+
+.period-date-popover-header strong {
+  font-size: 0.88rem;
+}
+
+.period-date-popover-header small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin-top: 2px;
 }
 
 .custom-date-fields {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .custom-date-fields label {
-  color: #4f6359;
+  color: var(--muted);
   display: grid;
-  font-size: 0.78rem;
-  font-weight: 700;
-  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  gap: 6px;
 }
 
 .custom-date-fields input {
   background: #f5faf6;
   border: 1px solid var(--period-border);
-  border-radius: 12px;
+  border-radius: 8px;
   color: var(--period-dark);
   font: inherit;
-  font-weight: 750;
+  font-size: 0.8rem;
+  font-weight: 700;
   min-height: 42px;
-  padding: 0 12px;
+  min-width: 0;
+  padding: 0 10px;
   width: 100%;
 }
 
-.custom-date-fields input:focus-visible,
-.period-chip:focus-visible,
-.custom-period-nav button:focus-visible {
-  outline: 3px solid rgba(30, 107, 60, 0.2);
-  outline-offset: 2px;
+.custom-date-fields input:focus-visible {
+  border-color: var(--brand);
+  outline: 3px solid color-mix(in srgb, var(--brand) 18%, transparent);
 }
 
-@media (min-width: 720px) {
-  .period-filter-row {
-    flex-wrap: wrap;
-    overflow: visible;
-  }
+.period-date-summary {
+  background: var(--surface-strong);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  margin: 0;
+  padding: 9px 10px;
+}
 
-  .custom-period-panel {
-    max-width: 560px;
-  }
+.period-date-summary strong {
+  color: var(--text);
+}
 
+@media (max-width: 520px) {
   .custom-date-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }

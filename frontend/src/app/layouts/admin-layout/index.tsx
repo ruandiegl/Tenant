@@ -1,9 +1,10 @@
 import "./styles.css";
-import { PropsWithChildren, useState } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, Bike, Building2, ChefHat, LogOut, Menu as MenuIcon, MessageCircle, ReceiptText, Settings, Store } from "lucide-react";
-import { BrandLogo } from "../../../components/brand-logo";
+import { type PropsWithChildren, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { BarChart3, Bike, Building2, ChefHat, Menu as MenuIcon, MessageCircle, ReceiptText, Settings, Store } from "lucide-react";
+import { PanelSidebar, type PanelSidebarGroup, type PanelSidebarItem } from "../../../components/navigation/panel-sidebar";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
+import { SidebarInset, SidebarProvider } from "../../../components/ui/sidebar";
 import { useAuth } from "../../providers/auth-provider";
 import { useTenant } from "../../providers/tenant-provider";
 
@@ -36,9 +37,13 @@ export function AdminLayout({ children }: PropsWithChildren) {
   const { settings } = useTenant();
   const { user, logout, can } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const primaryItems: PanelSidebarItem[] = can(dashboardItem.permission) ? [dashboardItem] : [];
+  const groups: PanelSidebarGroup[] = adminNavGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => can(item.permission)) }))
+    .filter((group) => group.items.length > 0);
+  const secondaryItems: PanelSidebarItem[] = adminSupportItems.filter((item) => can(item.permission));
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -52,85 +57,21 @@ export function AdminLayout({ children }: PropsWithChildren) {
   };
 
   return (
-    <div className="admin-layout">
-      <aside className="admin-sidebar" aria-label="Menu administrativo">
-        <div className="admin-brand">
-          <BrandLogo compact />
-          <div>
-            <strong>podePedir</strong>
-            <span>{settings.brandName}</span>
-          </div>
-        </div>
-
-        <nav className="admin-sidebar-nav">
-          {can(dashboardItem.permission) ? (
-            <NavLink key={dashboardItem.to} to={dashboardItem.to} end={dashboardItem.end} title={dashboardItem.label}>
-              <span className="admin-nav-icon">
-                <dashboardItem.icon size={18} aria-hidden="true" />
-              </span>
-              <span>{dashboardItem.label}</span>
-            </NavLink>
-          ) : null}
-
-          {adminNavGroups.map((group) => {
-            const items = group.items.filter((item) => can(item.permission));
-            if (items.length === 0) return null;
-
-            const isGroupActive = items.some((item) => (item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)));
-
-            return (
-              <details className="admin-nav-group" key={group.label} open={isGroupActive}>
-                <summary title={group.label}>
-                  <span className="admin-nav-icon">
-                    <group.icon size={18} aria-hidden="true" />
-                  </span>
-                  <span>{group.label}</span>
-                </summary>
-                <div className="admin-nav-group-content">
-                  {items.map((item) => (
-                    <NavLink key={item.to} to={item.to} end={item.end} title={item.label}>
-                      <span className="admin-nav-icon">
-                        <item.icon size={18} aria-hidden="true" />
-                      </span>
-                      <span>{item.label}</span>
-                    </NavLink>
-                  ))}
-                </div>
-              </details>
-            );
-          })}
-
-          <div className="admin-nav-section">
-            {adminSupportItems.filter((item) => can(item.permission)).map((item) => (
-              <NavLink key={item.to} to={item.to} title={item.label}>
-                <span className="admin-nav-icon">
-                  <item.icon size={18} aria-hidden="true" />
-                </span>
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
-          </div>
-        </nav>
-
-        <div className="admin-sidebar-footer">
-          <div className="admin-user-card">
-            <span className="admin-avatar">{user?.name?.slice(0, 2).toUpperCase() ?? "AD"}</span>
-            <div>
-              <strong>{user?.name ?? "Admin"}</strong>
-              <span>{user?.email ?? "admin@podepedir.local"}</span>
-            </div>
-            <button aria-label="Sair do admin" onClick={() => setLogoutModalOpen(true)}>
-              <LogOut size={18} />
-            </button>
-          </div>
-          <div className="admin-tenant-chip">
-            <Store size={16} />
-            <span>Tenant ativo</span>
-          </div>
-        </div>
-      </aside>
-
-      <section className="admin-content">{children}</section>
+    <SidebarProvider className="admin-layout" storageKey="podepedir.admin.sidebar">
+      <PanelSidebar
+        ariaLabel="Menu administrativo"
+        brandSubtitle={settings.brandName}
+        brandTitle="podePedir"
+        contextIcon={Store}
+        contextLabel="Tenant ativo"
+        groups={groups}
+        onLogout={() => setLogoutModalOpen(true)}
+        primaryItems={primaryItems}
+        secondaryItems={secondaryItems}
+        userEmail={user?.email ?? "admin@podepedir.local"}
+        userName={user?.name ?? "Admin"}
+      />
+      <SidebarInset className="admin-content">{children}</SidebarInset>
       <ConfirmDialog
         open={logoutModalOpen}
         title="Sair da conta"
@@ -141,7 +82,6 @@ export function AdminLayout({ children }: PropsWithChildren) {
         onCancel={() => setLogoutModalOpen(false)}
         onConfirm={() => void handleLogout()}
       />
-    </div>
+    </SidebarProvider>
   );
 }
-

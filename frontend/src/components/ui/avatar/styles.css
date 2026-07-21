@@ -1,0 +1,28 @@
+.ui-avatar {
+  align-items: center;
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 36px;
+  justify-content: center;
+  overflow: hidden;
+  width: 36px;
+}
+
+.ui-avatar-image {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.ui-avatar-fallback {
+  align-items: center;
+  background: var(--accent);
+  color: #fff;
+  display: inline-flex;
+  font-size: 0.74rem;
+  font-weight: 850;
+  height: 100%;
+  justify-content: center;
+  width: 100%;
+}

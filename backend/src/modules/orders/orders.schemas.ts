@@ -46,6 +46,13 @@ export const createPublicOrderSchema = z.object({
         reference: z.string().optional()
       })
       .optional(),
+    payment: z
+      .object({
+        type: z.enum(["PIX", "CREDIT_CARD", "CASH"]),
+        mode: z.enum(["ONLINE", "OFFLINE"]).optional(),
+        methodId: z.string().min(1).optional()
+      })
+      .optional(),
     items: z.array(orderItemSchema).min(1)
   })
 });

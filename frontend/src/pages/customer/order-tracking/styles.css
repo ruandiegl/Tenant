@@ -61,6 +61,32 @@
   gap: 12px;
 }
 
+.payment-summary-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.tracking-pix-qr {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  justify-self: center;
+  max-width: 220px;
+  padding: 10px;
+  width: 100%;
+}
+
+.tracking-pix-copy {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: block;
+  font-family: var(--font-data);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+  padding: 10px;
+}
+
 .order-detail-items {
   display: grid;
   gap: 10px;

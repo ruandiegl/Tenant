@@ -1,8 +1,9 @@
-import { OrderStatus, Prisma } from "@prisma/client";
+import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { getSocketServer } from "../../config/socket.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { notifyOrderStatusChanged } from "../whatsapp/whatsapp.service.js";
+import { buildPublicPaymentSummary, createPixPaymentForOrder } from "../payments/payments.service.js";
 
 const publicCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 const PUBLIC_ORDER_ACCESS_MS = 12 * 60 * 60 * 1000;
@@ -26,6 +27,11 @@ type CreateOrderInput = {
     state: string;
     postalCode: string;
     reference?: string;
+  };
+  payment?: {
+    type: "PIX" | "CREDIT_CARD" | "CASH";
+    mode?: "ONLINE" | "OFFLINE";
+    methodId?: string;
   };
   items: Array<{
     productId: string;
@@ -110,6 +116,35 @@ function deliveryMethodWhere(method: DeliveryCalculationMethod): Prisma.Delivery
   };
 }
 
+function isPixOnlinePayment(payment?: CreateOrderInput["payment"]) {
+  return payment?.type === "PIX" && payment.mode !== "OFFLINE";
+}
+
+function normalizePublicOrder(order: {
+  payments?: Array<{
+    id: string;
+    status: PaymentStatus;
+    provider: string | null;
+    providerPaymentId: string | null;
+    metadata: unknown;
+    method?: { type: string } | null;
+  }>;
+}) {
+  if (!order.payments?.length) {
+    return {
+      ...order,
+      payment: null
+    };
+  }
+
+  const [latestPayment] = [...order.payments].sort((left, right) => left.id.localeCompare(right.id)).reverse();
+
+  return {
+    ...order,
+    payment: buildPublicPaymentSummary(latestPayment)
+  };
+}
+
 async function resolveDeliveryFee(params: {
   tenantId: string;
   branchId: string;
@@ -163,6 +198,23 @@ async function resolveDeliveryFee(params: {
   }
 
   return zoneByFee.fee;
+}
+
+async function loadPublicOrderById(orderId: string) {
+  const order = await prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
+    include: {
+      items: { include: { options: true, removedIngredients: true } },
+      deliveryAddress: true,
+      histories: { orderBy: { createdAt: "asc" } },
+      payments: {
+        include: { method: true },
+        orderBy: { createdAt: "desc" }
+      }
+    }
+  });
+
+  return normalizePublicOrder(order);
 }
 
 export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInput) => {
@@ -448,9 +500,21 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
     });
   });
 
+  if (isPixOnlinePayment(data.payment)) {
+    await createPixPaymentForOrder({
+      tenantId: tenant.id,
+      orderId: order.id,
+      publicCode: order.publicCode,
+      customerName: data.customerName,
+      customerPhone: data.customerPhone,
+      customerEmail: data.customerEmail,
+      total: Number(total)
+    });
+  }
+
   emitOrderEvent("order.created", order);
   void notifyOrderStatusChanged(tenant.id, order.id).catch(() => undefined);
-  return order;
+  return loadPublicOrderById(order.id);
 };
 
 export const getPublicOrder = async (tenantSlug: string, publicCodeValue: string) => {
@@ -466,14 +530,22 @@ export const getPublicOrder = async (tenantSlug: string, publicCodeValue: string
       publicCode: publicCodeValue,
       createdAt: { gte: new Date(Date.now() - PUBLIC_ORDER_ACCESS_MS) }
     },
-    include: { items: { include: { options: true, removedIngredients: true } }, deliveryAddress: true, histories: { orderBy: { createdAt: "asc" } } }
+    include: {
+      items: { include: { options: true, removedIngredients: true } },
+      deliveryAddress: true,
+      histories: { orderBy: { createdAt: "asc" } },
+      payments: {
+        include: { method: true },
+        orderBy: { createdAt: "desc" }
+      }
+    }
   });
 
   if (!order) {
     throw new AppError("Order not found", 404);
   }
 
-  return order;
+  return normalizePublicOrder(order);
 };
 
 export const listTenantOrders = (tenantId: string, branchId?: string, status?: OrderStatus, from?: string, to?: string) => {

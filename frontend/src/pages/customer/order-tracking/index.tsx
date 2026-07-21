@@ -2,6 +2,7 @@ import "./styles.css";
 import { useQuery } from "@tanstack/react-query";
 import { BellRing, Bike, ReceiptText, RefreshCcw, ShoppingBag } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import { useCustomerFlow } from "../../../app/providers/customer-flow-provider";
 import { useSocket } from "../../../app/providers/socket-provider";
 import { PageHeader } from "../../../components/ui/page-header";
@@ -46,6 +47,22 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
 
   const activeIndex = order ? trackingSteps.findIndex((step) => step.status === normalizeStatus(order.status)) : -1;
   const address = order?.deliveryAddress;
+
+  const handleCopyPix = async () => {
+    const payload = order?.payment?.pixCopyPaste;
+
+    if (!payload) {
+      toast.warning("Nenhum codigo Pix disponivel para este pedido.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(payload);
+      toast.success("Codigo Pix copiado.");
+    } catch {
+      toast.error("Nao foi possivel copiar o codigo Pix.");
+    }
+  };
 
   return (
     <section className="screen customer-screen">
@@ -103,6 +120,34 @@ export function OrderTracking({ publicCodeFallback = "" }: { publicCodeFallback?
               <h2>{trackingSteps[Math.max(activeIndex, 0)]?.label ?? "Pedido em andamento"}</h2>
               <p className="muted-text">{trackingSteps[Math.max(activeIndex, 0)]?.description}</p>
             </div>
+          </article>
+
+          <article className="panel payment-summary-panel">
+            <h2>Pagamento</h2>
+            <StatusBadge status={order.paymentStatus} />
+            <p className="muted-text">
+              {order.paymentStatus === "PAID"
+                ? "Pagamento confirmado."
+                : order.payment?.paymentType === "PIX"
+                  ? "Finalize o Pix para concluir a confirmacao financeira."
+                  : "Pagamento sera confirmado pela loja."}
+            </p>
+            {order.payment?.expiresAt ? <small>Expira em {new Date(order.payment.expiresAt).toLocaleString("pt-BR")}</small> : null}
+            {order.payment?.pixQrCode ? (
+              <img
+                alt="QR Code Pix"
+                className="tracking-pix-qr"
+                src={`data:image/png;base64,${order.payment.pixQrCode}`}
+              />
+            ) : null}
+            {order.payment?.pixCopyPaste ? (
+              <>
+                <code className="tracking-pix-copy">{order.payment.pixCopyPaste}</code>
+                <button className="secondary-button" onClick={() => void handleCopyPix()} type="button">
+                  Copiar codigo Pix
+                </button>
+              </>
+            ) : null}
           </article>
 
           <article className="panel">

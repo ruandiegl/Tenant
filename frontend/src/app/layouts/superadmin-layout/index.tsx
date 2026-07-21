@@ -1,12 +1,13 @@
 import "./styles.css";
-import { PropsWithChildren, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { Building2, ClipboardList, LayoutDashboard, LogOut, PackageCheck, ShieldCheck } from "lucide-react";
-import { BrandLogo } from "../../../components/brand-logo";
+import { type PropsWithChildren, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Building2, ClipboardList, LayoutDashboard, PackageCheck, ShieldCheck } from "lucide-react";
+import { PanelSidebar, type PanelSidebarItem } from "../../../components/navigation/panel-sidebar";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
+import { SidebarInset, SidebarProvider } from "../../../components/ui/sidebar";
 import { useAuth } from "../../providers/auth-provider";
 
-const navItems = [
+const navItems: PanelSidebarItem[] = [
   { to: "/superadmin", label: "Visao geral", icon: LayoutDashboard, end: true },
   { to: "/superadmin/tenants", label: "Tenants", icon: Building2 },
   { to: "/superadmin/planos", label: "Planos", icon: PackageCheck },
@@ -31,37 +32,20 @@ export function SuperAdminLayout({ children }: PropsWithChildren) {
   };
 
   return (
-    <div className="superadmin-layout">
-      <aside className="superadmin-sidebar" aria-label="Menu superadmin">
-        <div className="superadmin-brand">
-          <BrandLogo compact />
-          <div>
-            <strong>PodePedir TMS</strong>
-            <span>Console da plataforma</span>
-          </div>
-        </div>
-
-        <nav className="superadmin-nav">
-          {navItems.map((item) => (
-            <NavLink end={item.end} key={item.to} to={item.to}>
-              <item.icon size={18} aria-hidden="true" />
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="superadmin-operator">
-          <ShieldCheck size={18} aria-hidden="true" />
-          <div>
-            <strong>{user?.name ?? "Operador"}</strong>
-            <span>{user?.email ?? "superadmin@podepedir.local"}</span>
-          </div>
-          <button aria-label="Sair do superadmin" onClick={() => setLogoutModalOpen(true)} type="button">
-            <LogOut size={18} />
-          </button>
-        </div>
-      </aside>
-      <section className="superadmin-content">{children}</section>
+    <SidebarProvider className="superadmin-layout" storageKey="podepedir.superadmin.sidebar">
+      <PanelSidebar
+        ariaLabel="Menu superadmin"
+        brandSubtitle="Console da plataforma"
+        brandTitle="podePedir TMS"
+        contextIcon={ShieldCheck}
+        contextLabel="Acesso de plataforma"
+        onLogout={() => setLogoutModalOpen(true)}
+        primaryItems={navItems}
+        primaryLabel="Plataforma"
+        userEmail={user?.email ?? "superadmin@podepedir.local"}
+        userName={user?.name ?? "Operador"}
+      />
+      <SidebarInset className="superadmin-content">{children}</SidebarInset>
       <ConfirmDialog
         open={logoutModalOpen}
         title="Sair do superadmin"
@@ -72,6 +56,6 @@ export function SuperAdminLayout({ children }: PropsWithChildren) {
         onCancel={() => setLogoutModalOpen(false)}
         onConfirm={() => void handleLogout()}
       />
-    </div>
+    </SidebarProvider>
   );
 }

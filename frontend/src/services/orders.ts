@@ -1,4 +1,4 @@
-import { Order, OrderStatus } from "../types/database";
+import { Order, OrderPaymentSummary, OrderStatus } from "../types/database";
 import { protectedApi, api, getApiBaseUrl } from "./api";
 import { DEFAULT_PUBLIC_TENANT_SLUG } from "../utils/public-tenant-route";
 const DEMO_BRANCH_ID = import.meta.env.VITE_DEMO_BRANCH_ID;
@@ -9,6 +9,7 @@ type BackendOrder = Omit<Order, "history" | "items" | "source"> & {
   history?: Order["history"];
   items: Order["items"];
   deliveryAddress?: Order["deliveryAddress"];
+  payment?: OrderPaymentSummary | null;
   payments?: unknown[];
 };
 
@@ -33,6 +34,11 @@ export type PublicOrderPayload = {
     state: string;
     postalCode: string;
     reference?: string;
+  };
+  payment?: {
+    type: "PIX" | "CREDIT_CARD" | "CASH";
+    mode?: "ONLINE" | "OFFLINE";
+    methodId?: string;
   };
   items: Array<{
     productId: string;

@@ -1,13 +1,9 @@
 import "./styles.css";
-import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Clock, Sun, type LucideIcon } from "lucide-react";
-import { useState } from "react";
-import {
-  addDays,
-  formatMonthLabel,
-  formatShortDate,
-  fromDateInputValue,
-  type PeriodFilterValue
-} from "../../../utils/period-range";
+import { ArrowRight, CalendarDays, Clock, Sun, type LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "../../ui/toggle-group";
+import { addDays, formatShortDate, fromDateInputValue, type PeriodFilterValue } from "../../../utils/period-range";
 
 type PeriodFilterProps = {
   period: PeriodFilterValue;
@@ -19,19 +15,12 @@ type PeriodFilterProps = {
   onCustomEndDateChange: (date: string) => void;
 };
 
-const periodLabels: Record<PeriodFilterValue, string> = {
-  today: "Hoje",
-  yesterday: "Ontem",
-  last7: "7 dias",
-  custom: "Data"
-};
-
-const periodIcons: Record<PeriodFilterValue, LucideIcon> = {
-  today: Sun,
-  yesterday: Clock,
-  last7: ArrowRight,
-  custom: CalendarDays
-};
+const periodOptions: Array<{ value: PeriodFilterValue; label: string; icon: LucideIcon }> = [
+  { value: "today", label: "Hoje", icon: Sun },
+  { value: "yesterday", label: "Ontem", icon: Clock },
+  { value: "last7", label: "7 dias", icon: ArrowRight },
+  { value: "custom", label: "Data", icon: CalendarDays }
+];
 
 export function PeriodFilter({
   period,
@@ -42,7 +31,7 @@ export function PeriodFilter({
   onCustomStartDateChange,
   onCustomEndDateChange
 }: PeriodFilterProps) {
-  const [customMonth, setCustomMonth] = useState(() => new Date());
+  const [customOpen, setCustomOpen] = useState(period === "custom");
   const today = new Date();
   const yesterday = addDays(today, -1);
   const last7Start = addDays(today, -6);
@@ -53,61 +42,84 @@ export function PeriodFilter({
   const periodSublabels: Record<PeriodFilterValue, string> = {
     today: formatShortDate(today),
     yesterday: formatShortDate(yesterday),
-    last7: `${formatShortDate(last7Start)}–${formatShortDate(today)}`,
-    custom: `${formatShortDate(normalizedStart)}–${formatShortDate(normalizedEnd)}`
+    last7: `${formatShortDate(last7Start)} - ${formatShortDate(today)}`,
+    custom: `${formatShortDate(normalizedStart)} - ${formatShortDate(normalizedEnd)}`
   };
 
-  function moveCustomMonth(direction: -1 | 1) {
-    setCustomMonth((current) => {
-      const next = new Date(current);
-      next.setMonth(current.getMonth() + direction);
-      return next;
-    });
-  }
+  useEffect(() => {
+    if (period !== "custom") setCustomOpen(false);
+  }, [period]);
+
+  const handlePeriodChange = (nextPeriod: string) => {
+    if (!nextPeriod) return;
+    const next = nextPeriod as PeriodFilterValue;
+    onPeriodChange(next);
+    setCustomOpen(next === "custom");
+  };
 
   return (
     <div className="period-filter" aria-label={ariaLabel}>
-      <div className="period-filter-row">
-        {(Object.keys(periodLabels) as PeriodFilterValue[]).map((item) => {
-          const Icon = periodIcons[item];
-          const isActive = period === item;
+      <Popover open={customOpen} onOpenChange={setCustomOpen}>
+        <ToggleGroup aria-label={ariaLabel} className="period-filter-row" onValueChange={handlePeriodChange} value={period}>
+          {periodOptions.map((item) => {
+            const Icon = item.icon;
+            const chip = (
+              <ToggleGroupItem aria-label={`${item.label}: ${periodSublabels[item.value]}`} className="period-chip" key={item.value} value={item.value}>
+                <span className="period-chip-icon">
+                  <Icon aria-hidden="true" />
+                </span>
+                <span className="period-chip-label">{item.label}</span>
+                <span className="period-chip-context">{periodSublabels[item.value]}</span>
+              </ToggleGroupItem>
+            );
 
-          return (
-            <button className={`period-chip${isActive ? " is-active" : ""}`} key={item} onClick={() => onPeriodChange(item)} type="button">
-              <span className="period-chip-icon">
-                <Icon size={16} />
-              </span>
-              <span className="period-chip-label">{periodLabels[item]}</span>
-              <span className="period-chip-context" aria-hidden={!isActive}>
-                {periodSublabels[item]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+            if (item.value !== "custom") return chip;
 
-      <div className={`custom-period-panel${period === "custom" ? " is-open" : ""}`}>
-        <div className="custom-period-nav" aria-label="Navegacao do mes">
-          <button type="button" onClick={() => moveCustomMonth(-1)} aria-label="Mes anterior">
-            <ChevronLeft size={16} />
-          </button>
-          <strong>{formatMonthLabel(customMonth)}</strong>
-          <button type="button" onClick={() => moveCustomMonth(1)} aria-label="Proximo mes">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-        <p>Selecione um intervalo</p>
-        <div className="custom-date-fields">
-          <label>
-            De
-            <input type="date" value={customStartDate} onChange={(event) => onCustomStartDateChange(event.target.value)} />
-          </label>
-          <label>
-            Até
-            <input type="date" value={customEndDate} onChange={(event) => onCustomEndDateChange(event.target.value)} />
-          </label>
-        </div>
-      </div>
+            return (
+              <PopoverTrigger asChild key={item.value}>
+                {chip}
+              </PopoverTrigger>
+            );
+          })}
+        </ToggleGroup>
+
+        <PopoverContent className="period-date-popover" collisionPadding={14}>
+          <div className="period-date-popover-header">
+            <span>
+              <CalendarDays aria-hidden="true" />
+            </span>
+            <div>
+              <strong>Intervalo personalizado</strong>
+              <small>Selecione as datas inicial e final.</small>
+            </div>
+          </div>
+          <div className="custom-date-fields">
+            <label>
+              <span>De</span>
+              <input
+                aria-label="Data inicial"
+                max={customEndDate}
+                onChange={(event) => onCustomStartDateChange(event.target.value)}
+                type="date"
+                value={customStartDate}
+              />
+            </label>
+            <label>
+              <span>Ate</span>
+              <input
+                aria-label="Data final"
+                min={customStartDate}
+                onChange={(event) => onCustomEndDateChange(event.target.value)}
+                type="date"
+                value={customEndDate}
+              />
+            </label>
+          </div>
+          <p className="period-date-summary">
+            Exibindo de <strong>{formatShortDate(normalizedStart)}</strong> ate <strong>{formatShortDate(normalizedEnd)}</strong>
+          </p>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

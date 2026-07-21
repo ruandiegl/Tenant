@@ -2,7 +2,7 @@ import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useRe
 import { useLocation } from "react-router-dom";
 import { useCatalog } from "./catalog-provider";
 import { ordersService } from "../../services/orders";
-import { Product } from "../../types/database";
+import { OrderPaymentSummary, PaymentStatus, Product } from "../../types/database";
 import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug } from "../../utils/public-tenant-route";
 
 export type CustomerSelectedOption = {
@@ -67,8 +67,10 @@ export type CustomerProfileDraft = {
 export type PlacedCustomerOrder = {
   publicCode: string;
   status: "PLACED" | "ACCEPTED" | "PREPARING";
+  paymentStatus: PaymentStatus;
   total: number;
   paymentType: CustomerPaymentDraft["type"];
+  payment?: OrderPaymentSummary | null;
   estimatedReadyAt: string;
   placedAt: string;
 };
@@ -165,8 +167,55 @@ function isOrderWithinRetention(order: PlacedCustomerOrder, now = Date.now()) {
 function normalizeStoredOrder(order: PlacedCustomerOrder): PlacedCustomerOrder {
   return {
     ...order,
+    paymentStatus: order.paymentStatus ?? "PENDING",
+    payment: order.payment ?? null,
     placedAt: order.placedAt || order.estimatedReadyAt
   };
+}
+
+function normalizeCartNotes(notes?: string) {
+  const normalized = (notes ?? "").trim();
+  return normalized.toLocaleLowerCase("pt-BR") === "lanche completo" ? "" : normalized;
+}
+
+function getCartItemConfigurationKey(item: Pick<CustomerCartItem, "productId" | "options" | "removedIngredients" | "notes">) {
+  const optionKey = (item.options ?? [])
+    .map((option) => `${option.optionItemId}:${option.quantity}`)
+    .sort()
+    .join("|");
+  const removedIngredientKey = (item.removedIngredients ?? [])
+    .map((ingredient) => ingredient.optionItemId)
+    .sort()
+    .join("|");
+
+  return [item.productId, optionKey, removedIngredientKey, normalizeCartNotes(item.notes)].join("::");
+}
+
+function consolidateCartItems(items: CustomerCartItem[]) {
+  const consolidated = new Map<string, CustomerCartItem>();
+
+  items.forEach((item) => {
+    const normalizedItem = {
+      ...item,
+      options: item.options ?? [],
+      removedIngredients: item.removedIngredients ?? [],
+      notes: normalizeCartNotes(item.notes)
+    };
+    const configurationKey = getCartItemConfigurationKey(normalizedItem);
+    const existing = consolidated.get(configurationKey);
+
+    if (existing) {
+      consolidated.set(configurationKey, {
+        ...existing,
+        quantity: existing.quantity + normalizedItem.quantity
+      });
+      return;
+    }
+
+    consolidated.set(configurationKey, normalizedItem);
+  });
+
+  return Array.from(consolidated.values());
 }
 
 function readStoredFlow(tenantSlug: string): StoredCustomerFlow {
@@ -179,6 +228,7 @@ function readStoredFlow(tenantSlug: string): StoredCustomerFlow {
     const recentOrders = (stored.recentOrders ?? []).map(normalizeStoredOrder).filter((storedOrder) => isOrderWithinRetention(storedOrder));
     const sanitized = {
       ...stored,
+      items: consolidateCartItems(stored.items ?? []),
       order: order && isOrderWithinRetention(order) ? order : null,
       recentOrders
     };
@@ -300,23 +350,7 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
       ...totals,
       addProduct: (product, options = [], notes = "", removedIngredients = []) => {
         setOrder(null);
-        setItems((current) => {
-          const optionKey = options.map((option) => option.optionItemId).sort().join("|");
-          const removedIngredientKey = removedIngredients.map((ingredient) => ingredient.optionItemId).sort().join("|");
-          const existing = current.find(
-            (item) =>
-              item.productId === product.id &&
-              item.notes === notes &&
-              (item.removedIngredients ?? []).map((ingredient) => ingredient.optionItemId).sort().join("|") === removedIngredientKey &&
-              item.options.map((option) => option.optionItemId).sort().join("|") === optionKey
-          );
-
-          if (existing) {
-            return current.map((item) => (item.id === existing.id ? { ...item, quantity: item.quantity + 1 } : item));
-          }
-
-          return [...current, createCartItem(product, options, notes, removedIngredients)];
-        });
+        setItems((current) => consolidateCartItems([...current, createCartItem(product, options, notes, removedIngredients)]));
       },
       incrementItem: (itemId) => {
         setItems((current) => current.map((item) => (item.id === itemId ? { ...item, quantity: item.quantity + 1 } : item)));
@@ -355,6 +389,10 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
             customerEmail: profile.email || undefined,
             deliveryFee: totals.deliveryFee,
             deliveryZoneId: fulfillment.type === "DELIVERY" ? fulfillment.zoneId : undefined,
+            payment: {
+              type: payment.type,
+              mode: payment.type === "PIX" ? "ONLINE" : "OFFLINE"
+            },
             notes: `Pagamento selecionado: ${payment.type}${fulfillment.type === "PICKUP" ? " | Retirada na loja" : fulfillment.zoneName ? ` | Entrega: ${fulfillment.zoneName}` : ""}`,
             deliveryAddress:
               fulfillment.type === "DELIVERY"
@@ -388,8 +426,10 @@ export function CustomerFlowProvider({ children }: PropsWithChildren) {
         const nextOrder: PlacedCustomerOrder = {
           publicCode: createdOrder.publicCode,
           status: createdOrder.status === "ACCEPTED" || createdOrder.status === "PREPARING" ? createdOrder.status : "PLACED",
+          paymentStatus: createdOrder.paymentStatus,
           total: createdOrder.total,
           paymentType: payment.type,
+          payment: createdOrder.payment ?? null,
           estimatedReadyAt: createdOrder.estimatedReadyAt,
           placedAt: createdOrder.createdAt || new Date().toISOString()
         };

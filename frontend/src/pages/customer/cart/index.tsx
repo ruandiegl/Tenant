@@ -11,6 +11,7 @@ import { PageHeader } from "../../../components/ui/page-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { deliveryZonesService } from "../../../services/delivery-zones";
+import { ordersService } from "../../../services/orders";
 import { DeliveryCalculationMethod, DeliveryZone } from "../../../types/database";
 import { formatCurrency } from "../../../utils/format";
 import { formatCep, formatPhone, onlyDigits } from "../../../utils/input-masks";
@@ -22,6 +23,21 @@ type ZoneDistanceMap = Record<string, number>;
 
 const geocodeCache = new Map<string, GeoPoint | null>();
 const EMPTY_DELIVERY_ZONES: DeliveryZone[] = [];
+
+function paymentTypeLabel(type: "PIX" | "CREDIT_CARD" | "CASH") {
+  if (type === "PIX") return "PIX";
+  if (type === "CREDIT_CARD") return "Cartao na entrega";
+  return "Dinheiro";
+}
+
+function paymentStatusDescription(status: string, paymentType: "PIX" | "CREDIT_CARD" | "CASH") {
+  if (status === "PAID") return "Pagamento confirmado. A loja pode seguir com o pedido.";
+  if (status === "FAILED") return "Nao conseguimos confirmar o pagamento. Tente novamente ou escolha outra forma.";
+  if (status === "CANCELLED") return "A cobranca foi cancelada.";
+  if (status === "REFUNDED" || status === "PARTIALLY_REFUNDED") return "Pagamento devolvido total ou parcialmente.";
+  if (paymentType === "PIX") return "Finalize o pagamento Pix para concluir a confirmacao financeira do pedido.";
+  return "A loja recebeu o pedido e vai confirmar o pagamento na entrega.";
+}
 
 function normalizeZoneText(value: string) {
   return value
@@ -192,7 +208,17 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
     staleTime: 60_000
   });
 
-  const paymentLabel = payment.type === "PIX" ? "PIX" : payment.type === "CREDIT_CARD" ? "Cartao de credito" : "Dinheiro";
+  const paymentLabel = paymentTypeLabel(payment.type);
+  const {
+    data: liveOrder,
+    refetch: refetchLiveOrder,
+    isFetching: isFetchingLiveOrder
+  } = useQuery({
+    enabled: step === "done" && Boolean(order?.publicCode),
+    queryKey: ["customer-checkout-order", tenantSlug, order?.publicCode],
+    queryFn: () => ordersService.getByPublicCode(order!.publicCode, tenantSlug),
+    refetchInterval: step === "done" && order?.paymentType === "PIX" ? 5_000 : false
+  });
   const activeDeliveryMethod = settings.deliveryCalculationMethod ?? getFallbackDeliveryMethod(deliveryZones);
   const deliveryZonesForMethod = useMemo(
     () => filterZonesByMethod(deliveryZones, activeDeliveryMethod),
@@ -233,6 +259,14 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
         : step === "payment"
           ? "Escolha a forma de pagamento para confirmar."
           : "Seu pedido foi recebido pela loja.";
+  const displayedOrder = liveOrder && order?.publicCode === liveOrder.publicCode
+    ? {
+        ...order,
+        status: liveOrder.status === "ACCEPTED" || liveOrder.status === "PREPARING" ? liveOrder.status : "PLACED",
+        paymentStatus: liveOrder.paymentStatus,
+        payment: liveOrder.payment ?? null
+      }
+    : order;
 
   useEffect(() => {
     const cep = onlyDigits(address.postalCode);
@@ -519,12 +553,6 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       return;
     }
 
-    if (payment.type === "CREDIT_CARD" && (!payment.cardName || !payment.cardNumber || !payment.cardExpiry || !payment.cardCvv)) {
-      setError("Preencha os dados do cartao.");
-      toast.warning("Preencha os dados do cartao.");
-      return;
-    }
-
     setIsSubmittingOrder(true);
 
     try {
@@ -549,6 +577,22 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
     navigate(tenantPath("/carrinho"));
     setError(null);
     toast.info("Carrinho liberado para um novo pedido.");
+  };
+
+  const handleCopyPix = async () => {
+    const payload = displayedOrder?.payment?.pixCopyPaste;
+
+    if (!payload) {
+      toast.warning("Pix ainda nao disponivel para copia.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(payload);
+      toast.success("Codigo Pix copiado.");
+    } catch {
+      toast.error("Nao foi possivel copiar o codigo Pix.");
+    }
   };
 
   const confirmRemoveCartItem = () => {
@@ -643,12 +687,6 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                           Sem: {(item.removedIngredients ?? []).map((ingredient) => ingredient.name).join(", ")}
                         </small>
                       ) : null}
-                      <textarea
-                        aria-label={`Observacoes para ${item.productName}`}
-                        onChange={(event) => updateItemNotes(item.id, event.target.value)}
-                        placeholder="Observacoes do item"
-                        value={item.notes}
-                      />
                     </div>
                     <div className="quantity-control">
                       <button aria-label="Diminuir item" onClick={() => decrementItem(item.id)}>
@@ -874,45 +912,19 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                 type="button"
                 onClick={() => updatePayment({ type: "CREDIT_CARD" })}
               >
-                <CreditCard size={18} /> Cartao
+                <CreditCard size={18} /> Cartao na entrega
               </button>
               <button className={payment.type === "CASH" ? "selected" : ""} type="button" onClick={() => updatePayment({ type: "CASH" })}>
                 <ReceiptText size={18} /> Dinheiro
               </button>
             </div>
-
-            {payment.type === "CREDIT_CARD" ? (
-              <div className="form-grid two-columns">
-                <label className="field">
-                  <span>Nome no cartao</span>
-                  <div>
-                    <CreditCard size={18} />
-                    <input value={payment.cardName} onChange={(event) => updatePayment({ cardName: event.target.value })} />
-                  </div>
-                </label>
-                <label className="field">
-                  <span>Numero</span>
-                  <div>
-                    <CreditCard size={18} />
-                    <input value={payment.cardNumber} onChange={(event) => updatePayment({ cardNumber: event.target.value })} />
-                  </div>
-                </label>
-                <label className="field">
-                  <span>Validade</span>
-                  <div>
-                    <CreditCard size={18} />
-                    <input value={payment.cardExpiry} onChange={(event) => updatePayment({ cardExpiry: event.target.value })} placeholder="MM/AA" />
-                  </div>
-                </label>
-                <label className="field">
-                  <span>CVV</span>
-                  <div>
-                    <CreditCard size={18} />
-                    <input value={payment.cardCvv} onChange={(event) => updatePayment({ cardCvv: event.target.value })} />
-                  </div>
-                </label>
-              </div>
-            ) : null}
+            <p className="field-hint payment-help">
+              {payment.type === "PIX"
+                ? "Voce vai receber o QR Code do Pix logo apos confirmar o pedido."
+                : payment.type === "CREDIT_CARD"
+                  ? "Cartao sera combinado e cobrado na entrega ou retirada."
+                  : "Leve dinheiro ou combine o troco com a loja."}
+            </p>
 
             {payment.type === "CASH" ? (
               <label className="field">
@@ -947,12 +959,12 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
         </article>
       ) : null}
 
-      {step === "done" && order ? (
+      {step === "done" && displayedOrder ? (
         <div className="checkout-grid">
           <article className="panel success-panel">
-            <StatusBadge status={order.status} />
-            <h2>Pedido #{order.publicCode}</h2>
-            <p className="muted-text">Pagamento por {paymentLabel}. A loja recebeu seu pedido e vai atualizar o andamento.</p>
+            <StatusBadge status={displayedOrder.status} />
+            <h2>Pedido #{displayedOrder.publicCode}</h2>
+            <p className="muted-text">{paymentStatusDescription(displayedOrder.paymentStatus, displayedOrder.paymentType)}</p>
             <div className="timeline">
               {["PLACED", "ACCEPTED", "PREPARING"].map((status) => (
                 <div className="active" key={status}>
@@ -967,6 +979,35 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
             <Link className="wide-link" to={tenantPath("/pedido")}>
               Acompanhar pedido
             </Link>
+          </article>
+
+          <article className="panel pix-payment-panel">
+            <h2>Pagamento</h2>
+            <StatusBadge status={displayedOrder.paymentStatus} />
+            <p className="muted-text">Forma escolhida: {paymentTypeLabel(displayedOrder.paymentType)}</p>
+            {displayedOrder.payment?.expiresAt ? <p className="muted-text">Expira em {new Date(displayedOrder.payment.expiresAt).toLocaleString("pt-BR")}</p> : null}
+            {displayedOrder.payment?.pixQrCode ? (
+              <img
+                alt="QR Code Pix"
+                className="pix-qr-code"
+                src={`data:image/png;base64,${displayedOrder.payment.pixQrCode}`}
+              />
+            ) : null}
+            {displayedOrder.payment?.pixCopyPaste ? (
+              <div className="pix-copy-box">
+                <code>{displayedOrder.payment.pixCopyPaste}</code>
+              </div>
+            ) : null}
+            {displayedOrder.paymentType === "PIX" ? (
+              <>
+                <button className="secondary-button" onClick={() => void refetchLiveOrder()} type="button">
+                  {isFetchingLiveOrder ? "Atualizando..." : "Ja paguei, verificar agora"}
+                </button>
+                <button className="primary-button" onClick={() => void handleCopyPix()} type="button">
+                  Copiar codigo Pix
+                </button>
+              </>
+            ) : null}
           </article>
 
           <article className="panel">
@@ -1040,4 +1081,3 @@ function OrderTotals({
     </article>
   );
 }
-
