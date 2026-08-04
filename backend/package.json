@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "node scripts/run-tsx.cjs watch src/server.ts",
     "build": "prisma generate && tsc",
     "start": "node dist/src/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
-    "seed": "tsx prisma/seed.ts",
+    "seed": "node scripts/run-tsx.cjs prisma/seed.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
