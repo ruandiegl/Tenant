@@ -544,6 +544,24 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   });
   await ensureDefaultTemplates(tenantId, session.id);
 
+  const currentWahaSession = await wahaRequest<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(sessionName)}`, { timeoutMs: 5_000 }).catch(() => null);
+  const currentWahaStatus = asString(currentWahaSession?.status);
+  const normalizedCurrentWahaStatus = normalizeWahaStatus(currentWahaStatus);
+
+  if (normalizedCurrentWahaStatus === "CONNECTED") {
+    const connected = await updateSessionFromWahaStatus(session, "CONNECTED", { lastError: null });
+
+    return mapSession(connected);
+  }
+
+  if (normalizedCurrentWahaStatus === "ERROR") {
+    await wahaRequest(`/api/sessions/${encodeURIComponent(sessionName)}`, { method: "DELETE" }).catch((error) => {
+      if (getWahaStatus(error) !== 404) {
+        throw error;
+      }
+    });
+  }
+
   const webhooks = [
     {
       url: webhookUrl,
