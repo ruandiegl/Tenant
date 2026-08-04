@@ -534,7 +534,7 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   const webhooks = [
     {
       url: webhookUrl,
-      events: ["message", "message.any", "session.status", "qr"],
+      events: ["message", "message.any", "session.status"],
       ...(env.WAHA_WEBHOOK_SECRET ? { hmac: { key: env.WAHA_WEBHOOK_SECRET } } : {})
     }
   ];

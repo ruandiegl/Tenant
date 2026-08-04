@@ -193,7 +193,7 @@ Mas registrar tambem o status bruto do WAHA nos logs e, se necessario, no `lastE
 
 Recomendacao:
 
-- Usar webhooks WAHA `session.status` e `qr` para atualizar a sessao.
+- Usar webhook WAHA `session.status` para atualizar a sessao e buscar QR ativamente via `/api/{session}/auth/qr`. Nao configurar evento `qr` sem confirmar suporte da versao, pois a versao em producao rejeita esse evento com HTTP 400.
 - Emitir Socket.IO para o tenant quando chegar novo QR ou novo status.
 - Manter polling no frontend como fallback, mas com intervalo e mensagens adequadas.
 - Sempre rebuscar QR quando o evento/status indicar `SCAN_QR_CODE`.
@@ -306,7 +306,7 @@ Saida esperada:
 1. Revisar `createOrStartSession` em `whatsapp.service.ts`.
 2. Confirmar se a criacao de sessao WAHA envia webhooks corretos:
    - `session.status`;
-   - `qr`, se suportado pela versao/engine;
+   - QR via endpoint de autenticacao, nao via webhook `qr` salvo se a versao/engine confirmar suporte;
    - `message`;
    - `message.any`, se necessario para capturar todos os eventos.
 3. Revisar `refreshSessionQr`:

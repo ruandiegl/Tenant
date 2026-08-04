@@ -111,7 +111,8 @@ Cuidados:
 - Se `/tenant/whatsapp/health` retornar HTML com `Cannot GET /api/sessions`, a API provavelmente esta apontando para porta/base URL errada.
 - O volume persistente do WAHA deve permanecer montado no diretorio de sessoes, por exemplo `/app/.sessions`, para a sessao sobreviver a redeploys.
 - Webhooks devem apontar para `PUBLIC_BACKEND_URL/public/webhooks/waha`, nao para o dominio publico do proprio WAHA.
-- Eventos esperados para sessao/QR/mensagens: `session.status`, `qr`, `message` e `message.any`.
+- Eventos esperados para sessao/mensagens: `session.status`, `message` e `message.any`.
+- Nao configure evento `qr` sem confirmar suporte da versao do WAHA em uso. A imagem observada em producao rejeita `qr` com HTTP 400; o QR deve ser buscado pela API em `/api/{session}/auth/qr`.
 
 ## Checklist de deploy
 
