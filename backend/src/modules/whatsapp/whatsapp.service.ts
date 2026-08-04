@@ -534,7 +534,7 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   const webhooks = [
     {
       url: webhookUrl,
-      events: ["message", "session.status"],
+      events: ["message", "message.any", "session.status", "qr"],
       ...(env.WAHA_WEBHOOK_SECRET ? { hmac: { key: env.WAHA_WEBHOOK_SECRET } } : {})
     }
   ];
@@ -632,11 +632,11 @@ export const refreshSessionQr = async (tenantId: string): Promise<ReturnType<typ
     return mapSession(syncedSession);
   }
 
-  const qrPath = `/api/${encodeURIComponent(session.sessionName)}/auth/qr?format=image`;
+  const qrPath = `/api/${encodeURIComponent(syncedSession.sessionName)}/auth/qr?format=image`;
   let response: unknown;
 
   try {
-    response = await wahaQrRequest(qrPath);
+    response = await wahaQrRequest(qrPath, "POST");
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const reportedStatus = getWahaReportedStatus(error);
@@ -673,7 +673,7 @@ export const refreshSessionQr = async (tenantId: string): Promise<ReturnType<typ
       throw error;
     }
 
-    response = await wahaQrRequest(qrPath, "POST");
+    response = await wahaQrRequest(qrPath);
   }
   const qrCode =
     typeof response === "string"

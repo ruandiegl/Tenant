@@ -96,6 +96,23 @@ Manter visiveis:
 - falhas de envio WhatsApp;
 - tempo de resposta em pedidos e cardapio.
 
+## WAHA em Railway
+
+Quando WAHA e API rodam no mesmo projeto Railway, a API deve falar com o WAHA pela rede privada e pela porta HTTP real do WAHA:
+
+```txt
+WAHA_BASE_URL=http://${{waha.RAILWAY_PRIVATE_DOMAIN}}:3000
+```
+
+Cuidados:
+
+- O WAHA informa nos logs a porta em que a API HTTP esta rodando. No container oficial, normalmente e `3000`.
+- Nao confundir a porta publica/antiga usada por outros servicos com a porta da API WAHA.
+- Se `/tenant/whatsapp/health` retornar HTML com `Cannot GET /api/sessions`, a API provavelmente esta apontando para porta/base URL errada.
+- O volume persistente do WAHA deve permanecer montado no diretorio de sessoes, por exemplo `/app/.sessions`, para a sessao sobreviver a redeploys.
+- Webhooks devem apontar para `PUBLIC_BACKEND_URL/public/webhooks/waha`, nao para o dominio publico do proprio WAHA.
+- Eventos esperados para sessao/QR/mensagens: `session.status`, `qr`, `message` e `message.any`.
+
 ## Checklist de deploy
 
 - `npm run build` no backend.
