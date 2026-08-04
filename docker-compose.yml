@@ -1,6 +1,8 @@
+name: podepedir-tenant
+
 services:
-  postgres:
-    image: postgres:16-alpine
+  podepedir-postgres:
+    image: podepedir-postgres:18-alpine
     container_name: podepedir-postgres
     restart: unless-stopped
     environment:
@@ -10,14 +12,14 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U podepedir -d podepedir"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  backend:
+  podepedir-backend:
     build:
       context: ./backend
     container_name: podepedir-backend
@@ -25,22 +27,22 @@ services:
     env_file:
       - ./backend/.env.example
     environment:
-      DATABASE_URL: postgresql://podepedir:Conquistas%4007@postgres:5432/podepedir?schema=public
+      DATABASE_URL: postgresql://podepedir:Conquistas%4007@podepedir-postgres:5432/podepedir?schema=public
       PORT: 3333
-      PUBLIC_BACKEND_URL: http://backend:3333
-      WAHA_BASE_URL: http://waha:3000
+      PUBLIC_BACKEND_URL: http://podepedir-backend:3333
+      WAHA_BASE_URL: http://podepedir-waha:3000
       WAHA_API_KEY: dev-waha-key
       WAHA_WEBHOOK_SECRET: dev-waha-webhook-secret
     ports:
       - "3333:3333"
     depends_on:
-      postgres:
+      podepedir-postgres:
         condition: service_healthy
-      waha:
+      podepedir-waha:
         condition: service_started
     command: sh -c "npx prisma migrate deploy && node dist/src/server.js"
 
-  waha:
+  podepedir-waha:
     image: devlikeapro/waha:latest
     container_name: podepedir-waha
     restart: unless-stopped
@@ -56,4 +58,8 @@ services:
 
 volumes:
   postgres_data:
+    external: true
+    name: tenant_postgres_data
   waha_sessions:
+    external: true
+    name: tenant_waha_sessions
