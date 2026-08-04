@@ -243,6 +243,31 @@
   justify-content: flex-end;
 }
 
+.template-preview {
+  background: rgba(15, 118, 110, 0.06);
+  border: 1px dashed rgba(15, 23, 42, 0.16);
+  border-radius: 8px;
+  padding: 10px 11px;
+}
+
+.template-preview span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.template-preview p {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .danger-action {
   color: var(--danger);
 }

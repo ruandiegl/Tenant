@@ -11,8 +11,10 @@ type WahaRequestOptions = {
 export type WahaErrorCode =
   | "WAHA_UNREACHABLE"
   | "WAHA_UNAUTHORIZED"
+  | "WAHA_API_NOT_FOUND"
   | "WAHA_SESSION_NOT_FOUND"
   | "WAHA_SESSION_NOT_READY"
+  | "WAHA_QR_UNAVAILABLE"
   | "WAHA_SEND_REJECTED";
 
 type WahaRequestResult<T> = {
@@ -23,12 +25,15 @@ type WahaRequestResult<T> = {
 
 export const wahaBaseUrl = () => env.WAHA_BASE_URL.replace(/\/$/, "");
 
-const wahaErrorCodeForStatus = (status: number, message: string): WahaErrorCode => {
+const wahaErrorCodeForStatus = (status: number, message: string, path: string): WahaErrorCode => {
   const lower = message.toLowerCase();
 
   if (status === 401 || status === 403) return "WAHA_UNAUTHORIZED";
+  if (status === 404 && (lower.includes("cannot get /api/sessions") || lower.includes("cannot post /api/sessions"))) return "WAHA_API_NOT_FOUND";
+  if (status === 404 && path === "/api/sessions") return "WAHA_API_NOT_FOUND";
   if (status === 404 || lower.includes("session not found")) return "WAHA_SESSION_NOT_FOUND";
   if (status === 409 || lower.includes("not ready") || lower.includes("not as expected")) return "WAHA_SESSION_NOT_READY";
+  if (path.includes("/auth/qr")) return "WAHA_QR_UNAVAILABLE";
 
   return "WAHA_SEND_REJECTED";
 };
@@ -78,7 +83,7 @@ export async function wahaRequestWithMeta<T>(path: string, options: WahaRequestO
   if (!response.ok) {
     const message = await response.text().catch(() => "");
     throw new AppError(message || `WAHA request failed with status ${response.status}`, 502, {
-      code: wahaErrorCodeForStatus(response.status, message),
+      code: wahaErrorCodeForStatus(response.status, message, path),
       wahaStatus: response.status,
       durationMs,
       path
@@ -137,7 +142,7 @@ export async function wahaQrRequest(path: string, method: "GET" | "POST" = "GET"
   if (!response.ok) {
     const message = await response.text().catch(() => "");
     throw new AppError(message || `WAHA QR request failed with status ${response.status}`, 502, {
-      code: wahaErrorCodeForStatus(response.status, message),
+      code: wahaErrorCodeForStatus(response.status, message, path),
       wahaStatus: response.status,
       durationMs: Date.now() - startedAt,
       path

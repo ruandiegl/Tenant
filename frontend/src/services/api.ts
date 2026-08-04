@@ -4,6 +4,17 @@ const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL ?? "admin@demo.local";
 const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD ?? "admin123";
 export const SESSION_EXPIRED_EVENT = "podepedir:session-expired";
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly details?: unknown
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 type LoginResponse = {
   token: string;
   tenant?: {
@@ -100,9 +111,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     let message = `API error ${response.status}`;
+    let details: unknown;
 
     try {
       const data = await response.json();
+      details = data?.details;
       const fieldErrors = data?.errors?.fieldErrors
         ? Object.entries(data.errors.fieldErrors)
             .flatMap(([field, errors]) => (Array.isArray(errors) ? errors.map((error) => `${field}: ${error}`) : []))
@@ -118,7 +131,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       clearSession({ notify: true });
     }
 
-    throw new Error(message);
+    throw new ApiError(message, response.status, details);
   }
 
   if (response.status === 204) {

@@ -4,9 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Loader2, MessageCircle, QrCode, RefreshCw, RotateCcw, Save, Send, Trash2, Wifi, WifiOff } from "lucide-react";
 import { toast } from "react-toastify";
 import { useTenant } from "../../../app/providers/tenant-provider";
+import { useSocket } from "../../../app/providers/socket-provider";
 import { PageHeader } from "../../../components/ui/page-header";
 import { whatsappService } from "../../../services/whatsapp";
-import { WhatsappMessageTemplate } from "../../../types/database";
+import { getWhatsappFriendlyError, getWhatsappSessionIssue } from "../../../services/whatsapp-errors";
+import { WhatsappMessageTemplate, WhatsappSession } from "../../../types/database";
 
 type TemplateDraft = {
   title: string;
@@ -29,6 +31,7 @@ const triggerLabels: Record<string, string> = {
 
 export function AdminWhatsapp() {
   const { tenant, settings } = useTenant();
+  const socket = useSocket();
   const queryClient = useQueryClient();
   const whatsappQuery = useQuery({
     queryKey: ["tenant-whatsapp-session", tenant.id],
@@ -53,7 +56,7 @@ export function AdminWhatsapp() {
       await queryClient.invalidateQueries({ queryKey: ["tenant-whatsapp-templates", tenant.id] });
       toast.success("Sessao WhatsApp criada. Leia o QR Code para conectar.");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel iniciar o WhatsApp.")
+    onError: (error) => toast.error(getWhatsappFriendlyError(error, "Nao foi possivel iniciar o WhatsApp."))
   });
   const whatsappQrMutation = useMutation({
     mutationFn: whatsappService.refreshQr,
@@ -61,7 +64,7 @@ export function AdminWhatsapp() {
       queryClient.setQueryData(["tenant-whatsapp-session", tenant.id], session);
       toast.success("QR Code atualizado.");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel atualizar o QR Code.")
+    onError: (error) => toast.error(getWhatsappFriendlyError(error, "Nao foi possivel atualizar o QR Code."))
   });
   const whatsappStopMutation = useMutation({
     mutationFn: whatsappService.stopSession,
@@ -70,7 +73,7 @@ export function AdminWhatsapp() {
       await queryClient.invalidateQueries({ queryKey: ["tenant-whatsapp-templates", tenant.id] });
       toast.success("WhatsApp desconectado.");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel desconectar o WhatsApp.")
+    onError: (error) => toast.error(getWhatsappFriendlyError(error, "Nao foi possivel desconectar o WhatsApp."))
   });
   const whatsappSettingsMutation = useMutation({
     mutationFn: whatsappService.updateSettings,
@@ -78,12 +81,12 @@ export function AdminWhatsapp() {
       queryClient.setQueryData(["tenant-whatsapp-session", tenant.id], session);
       toast.success("Preferencias do bot salvas.");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel salvar as preferencias.")
+    onError: (error) => toast.error(getWhatsappFriendlyError(error, "Nao foi possivel salvar as preferencias."))
   });
   const whatsappTestMutation = useMutation({
     mutationFn: whatsappService.sendTestMessage,
     onSuccess: () => toast.success("Mensagem de teste enviada."),
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel enviar a mensagem.")
+    onError: (error) => toast.error(getWhatsappFriendlyError(error, "Nao foi possivel enviar a mensagem."))
   });
   const templateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: TemplateDraft }) => whatsappService.updateTemplate(id, payload),
@@ -91,7 +94,7 @@ export function AdminWhatsapp() {
       await queryClient.invalidateQueries({ queryKey: ["tenant-whatsapp-templates", tenant.id] });
       toast.success("Mensagem salva.");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel salvar a mensagem.")
+    onError: (error) => toast.error(getWhatsappFriendlyError(error, "Nao foi possivel salvar a mensagem."))
   });
   const templateDeleteMutation = useMutation({
     mutationFn: whatsappService.deleteTemplate,
@@ -99,7 +102,7 @@ export function AdminWhatsapp() {
       await queryClient.invalidateQueries({ queryKey: ["tenant-whatsapp-templates", tenant.id] });
       toast.success("Mensagem removida do envio automatico.");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel remover a mensagem.")
+    onError: (error) => toast.error(getWhatsappFriendlyError(error, "Nao foi possivel remover a mensagem."))
   });
 
   useEffect(() => {
@@ -127,8 +130,39 @@ export function AdminWhatsapp() {
     });
   }, [templatesQuery.data]);
 
+  useEffect(() => {
+    const handleSessionEvent = (payload: unknown) => {
+      const session = payload as WhatsappSession | null;
+
+      if (!session || session.tenantId !== tenant.id) return;
+
+      queryClient.setQueryData(["tenant-whatsapp-session", tenant.id], session);
+
+      if (session.status === "CONNECTED") {
+        void queryClient.invalidateQueries({ queryKey: ["tenant-whatsapp-templates", tenant.id] });
+      }
+    };
+
+    socket.on("whatsapp.session_updated", handleSessionEvent);
+    socket.on("whatsapp.qr_updated", handleSessionEvent);
+
+    return () => {
+      socket.off("whatsapp.session_updated", handleSessionEvent);
+      socket.off("whatsapp.qr_updated", handleSessionEvent);
+    };
+  }, [queryClient, socket, tenant.id]);
+
   const whatsappSession = whatsappQuery.data;
   const whatsappConnected = whatsappSession?.status === "CONNECTED";
+  const whatsappIssue = getWhatsappSessionIssue(whatsappSession?.lastError);
+  const templatePreviewVariables = {
+    restaurante: settings.brandName || tenant.name,
+    cardapio: `${window.location.origin}/${tenant.slug}/menu`,
+    codigo: "1234",
+    rastreamento: `${window.location.origin}/${tenant.slug}/pedido/1234`,
+    total: "59,90",
+    cliente: "Cliente"
+  };
   const whatsappBusy =
     whatsappStartMutation.isPending ||
     whatsappQrMutation.isPending ||
@@ -172,6 +206,11 @@ export function AdminWhatsapp() {
     templateMutation.mutate({ id: template.id, payload: draft });
   };
 
+  const renderTemplatePreview = (body: string) =>
+    body.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, key: keyof typeof templatePreviewVariables) =>
+      templatePreviewVariables[key] ?? match
+    );
+
   return (
     <section className="screen">
       <PageHeader
@@ -199,9 +238,9 @@ export function AdminWhatsapp() {
             {whatsappSession?.sessionName && <code>{whatsappSession.sessionName}</code>}
           </div>
 
-          {whatsappSession?.lastError && <p className="form-error">{whatsappSession.lastError}</p>}
-          {whatsappSession?.status === "PENDING_QR" && !whatsappSession.lastError ? (
-            <p className="muted-text">Aguardando leitura ou atualizacao do QR Code.</p>
+          {whatsappIssue && <p className="form-error">{whatsappIssue}</p>}
+          {whatsappSession?.status === "PENDING_QR" && !whatsappIssue ? (
+            <p className="muted-text">Aguardando leitura do QR Code. Se ele expirar, atualizaremos automaticamente quando o WAHA enviar um novo evento.</p>
           ) : null}
 
           {whatsappSession?.qrCode ? (
@@ -335,6 +374,10 @@ export function AdminWhatsapp() {
                       onChange={(event) => updateTemplateDraft(template, { body: event.target.value })}
                       value={draft.body}
                     />
+                    <div className="template-preview">
+                      <span>Preview</span>
+                      <p>{renderTemplatePreview(draft.body)}</p>
+                    </div>
                     <div className="template-actions">
                       <button className="ghost-icon-button" disabled={templateMutation.isPending} onClick={() => saveTemplate(template)} type="button">
                         {templateMutation.isPending ? <Loader2 className="spin" size={16} /> : <Save size={16} />}
