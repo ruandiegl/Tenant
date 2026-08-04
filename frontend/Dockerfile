@@ -16,4 +16,4 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 EXPOSE 4173
-CMD ["sh", "-c", "npx serve --single --listen ${PORT:-4173} dist"]
+CMD ["sh", "-c", "npx serve --single --listen tcp://0.0.0.0:${PORT:-4173} dist"]
