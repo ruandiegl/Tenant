@@ -38,7 +38,6 @@ type SendTextMessageOptions = {
 };
 
 const SESSION_PREFIX = "podepedir";
-const AUTO_REPLY_COOLDOWN_MS = 2 * 60_000;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_TEMPLATES: Array<{
@@ -125,6 +124,7 @@ const toChatId = (phone: string) => {
 };
 
 const phoneFromChatId = (chatId: string) => chatId.replace(/@.*/, "").replace(/\D/g, "");
+const isLidChatId = (chatId: string) => chatId.endsWith("@lid");
 
 const asString = (value: unknown) => (typeof value === "string" ? value : undefined);
 
@@ -185,6 +185,19 @@ const getStableMessageId = (sessionName: string, payload: Record<string, unknown
   };
 
   return `hash:${crypto.createHash("sha256").update(JSON.stringify(stablePayload)).digest("hex")}`;
+};
+
+const resolveAutoReplyChatId = (input: { chatId: string; customerPhone?: string | null; contactPhone?: string | null }) => {
+  if (!isLidChatId(input.chatId)) {
+    return input.chatId;
+  }
+
+  const phone = input.customerPhone ?? input.contactPhone;
+  if (phone && phone.length >= 10 && phone.length <= 14) {
+    return toChatId(phone);
+  }
+
+  return input.chatId;
 };
 
 const getPayloadQrCode = (payload: Record<string, unknown>) =>
@@ -534,7 +547,7 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   const webhooks = [
     {
       url: webhookUrl,
-      events: ["message", "message.any", "session.status"],
+      events: ["message", "session.status"],
       ...(env.WAHA_WEBHOOK_SECRET ? { hmac: { key: env.WAHA_WEBHOOK_SECRET } } : {})
     }
   ];
@@ -1037,7 +1050,7 @@ const processWebhook = async (body: WahaWebhookBody) => {
       });
     }
 
-    if (eventType.includes("message")) {
+    if (eventType === "message") {
       await handleIncomingMessage(session, payload);
     }
 
@@ -1156,7 +1169,17 @@ const handleIncomingMessage = async (
     const lastAutoReplyAt = asString(botState.lastAutoReplyAt);
     const lastAutoReplyTime = lastAutoReplyAt ? new Date(lastAutoReplyAt).getTime() : 0;
 
-    if (Date.now() - lastAutoReplyTime < AUTO_REPLY_COOLDOWN_MS) {
+    const elapsedSinceLastAutoReply = Date.now() - lastAutoReplyTime;
+
+    if (elapsedSinceLastAutoReply < env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS) {
+      logWhatsapp("info", "auto reply skipped by cooldown", {
+        tenantId: session.tenantId,
+        sessionName: session.sessionName,
+        chatId,
+        elapsedMs: elapsedSinceLastAutoReply,
+        cooldownMs: env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS,
+        remainingMs: env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS - elapsedSinceLastAutoReply
+      });
       return;
     }
 
@@ -1180,7 +1203,22 @@ const handleIncomingMessage = async (
       await sleep(env.WHATSAPP_AUTO_REPLY_DELAY_MS);
     }
 
-    await sendTextMessage(session.tenantId, chatId, message, { source: "auto_reply" }).then(async () => {
+    const replyChatId = resolveAutoReplyChatId({
+      chatId,
+      customerPhone: nextCustomer?.phone,
+      contactPhone
+    });
+
+    if (isLidChatId(replyChatId)) {
+      logWhatsapp("warn", "auto reply sending to WAHA LID chat id", {
+        tenantId: session.tenantId,
+        sessionName: session.sessionName,
+        chatId,
+        contactPhone
+      });
+    }
+
+    await sendTextMessage(session.tenantId, replyChatId, message, { source: "auto_reply" }).then(async () => {
       await prisma.whatsappConversation.update({
         where: { id: conversation.id },
         data: {
