@@ -1183,20 +1183,32 @@ const handleIncomingMessage = async (
   }
 
   if (!fromMe && messageCreated && session.autoReplyEnabled && body) {
-    const botState = conversation.botState && typeof conversation.botState === "object" ? (conversation.botState as Record<string, unknown>) : {};
-    const lastAutoReplyAt = asString(botState.lastAutoReplyAt);
-    const lastAutoReplyTime = lastAutoReplyAt ? new Date(lastAutoReplyAt).getTime() : 0;
+    const reservedAt = new Date();
+    const cooldownStartedAfter = new Date(reservedAt.getTime() - env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS);
+    const reservation = await prisma.whatsappConversation.updateMany({
+      where: {
+        id: conversation.id,
+        OR: [{ lastAutoReplyAt: null }, { lastAutoReplyAt: { lte: cooldownStartedAfter } }]
+      },
+      data: { lastAutoReplyAt: reservedAt }
+    });
 
-    const elapsedSinceLastAutoReply = Date.now() - lastAutoReplyTime;
+    if (reservation.count === 0) {
+      const currentConversation = await prisma.whatsappConversation.findUnique({
+        where: { id: conversation.id },
+        select: { lastAutoReplyAt: true }
+      });
+      const elapsedSinceLastAutoReply = currentConversation?.lastAutoReplyAt
+        ? reservedAt.getTime() - currentConversation.lastAutoReplyAt.getTime()
+        : 0;
 
-    if (elapsedSinceLastAutoReply < env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS) {
       logWhatsapp("info", "auto reply skipped by cooldown", {
         tenantId: session.tenantId,
         sessionName: session.sessionName,
         chatId,
         elapsedMs: elapsedSinceLastAutoReply,
         cooldownMs: env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS,
-        remainingMs: env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS - elapsedSinceLastAutoReply
+        remainingMs: Math.max(0, env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS - elapsedSinceLastAutoReply)
       });
       return;
     }
@@ -1236,17 +1248,11 @@ const handleIncomingMessage = async (
       });
     }
 
-    await sendTextMessage(session.tenantId, replyChatId, message, { source: "auto_reply" }).then(async () => {
-      await prisma.whatsappConversation.update({
-        where: { id: conversation.id },
-        data: {
-          botState: {
-            ...botState,
-            lastAutoReplyAt: new Date().toISOString()
-          }
-        }
+    await sendTextMessage(session.tenantId, replyChatId, message, { source: "auto_reply" }).catch(async (error) => {
+      await prisma.whatsappConversation.updateMany({
+        where: { id: conversation.id, lastAutoReplyAt: reservedAt },
+        data: { lastAutoReplyAt: null }
       });
-    }).catch(async (error) => {
       await prisma.whatsappSession.update({
         where: { id: session.id },
         data: { lastError: error instanceof Error ? error.message : "Could not send WhatsApp auto reply" }
