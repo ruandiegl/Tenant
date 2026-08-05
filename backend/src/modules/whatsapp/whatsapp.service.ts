@@ -561,7 +561,6 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   const normalizedCurrentWahaStatus = normalizeWahaStatus(currentWahaStatus);
 
   if (normalizedCurrentWahaStatus === "CONNECTED") {
-    await updateWahaWebhookConfig(sessionName);
     const connected = await updateSessionFromWahaStatus(session, "CONNECTED", { lastError: null });
 
     return mapSession(connected);
@@ -638,36 +637,6 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
 
     return mapSession(updated);
   }
-};
-
-export const syncConnectedSessionWebhooks = async () => {
-  const sessions = await prisma.whatsappSession.findMany({
-    where: { status: "CONNECTED" },
-    select: { tenantId: true, sessionName: true }
-  });
-  let synced = 0;
-  let failed = 0;
-
-  for (const session of sessions) {
-    try {
-      await updateWahaWebhookConfig(session.sessionName);
-      synced += 1;
-      logWhatsapp("info", "WAHA webhook configuration synchronized", {
-        tenantId: session.tenantId,
-        sessionName: session.sessionName,
-        webhookHost: new URL(env.PUBLIC_BACKEND_URL).host
-      });
-    } catch (error) {
-      failed += 1;
-      logWhatsapp("error", "WAHA webhook configuration synchronization failed", {
-        tenantId: session.tenantId,
-        sessionName: session.sessionName,
-        error: getWahaErrorMessage(error)
-      });
-    }
-  }
-
-  return { total: sessions.length, synced, failed };
 };
 
 export const refreshSessionQr = async (tenantId: string): Promise<ReturnType<typeof mapSession>> => {
