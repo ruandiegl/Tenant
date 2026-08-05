@@ -149,11 +149,53 @@ const wahaWebhookConfig = () => [
   }
 ];
 
-const updateWahaWebhookConfig = (sessionName: string) =>
+const updateWahaWebhookConfig = (sessionName: string, currentConfig: Record<string, unknown> = {}) =>
   wahaRequest(`/api/sessions/${encodeURIComponent(sessionName)}`, {
     method: "PUT",
-    body: { config: { webhooks: wahaWebhookConfig() } }
+    body: {
+      name: sessionName,
+      config: { ...currentConfig, webhooks: wahaWebhookConfig() }
+    }
   });
+
+const syncWahaWebhookConfig = async (sessionName: string, knownSession?: Record<string, unknown> | null) => {
+  const wahaSession =
+    knownSession ??
+    (await wahaRequest<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(sessionName)}`, { timeoutMs: 5_000 }));
+  const currentConfig =
+    wahaSession.config && typeof wahaSession.config === "object"
+      ? (wahaSession.config as Record<string, unknown>)
+      : {};
+  const currentWebhooks = Array.isArray(currentConfig.webhooks) ? currentConfig.webhooks : [];
+  const expectedUrl = wahaWebhookConfig()[0].url;
+  const alreadyConfigured =
+    currentWebhooks.length === 1 &&
+    currentWebhooks.some((webhook) => {
+      if (!webhook || typeof webhook !== "object") return false;
+      const record = webhook as Record<string, unknown>;
+      const events = Array.isArray(record.events) ? record.events : [];
+
+      return record.url === expectedUrl && events.includes("message") && events.includes("session.status");
+    });
+
+  if (alreadyConfigured) return false;
+
+  const wasConnected = normalizeWahaStatus(asString(wahaSession.status)) === "CONNECTED";
+
+  if (wasConnected) {
+    await wahaRequest(`/api/sessions/${encodeURIComponent(sessionName)}/stop`, { method: "POST" });
+  }
+
+  try {
+    await updateWahaWebhookConfig(sessionName, currentConfig);
+  } finally {
+    if (wasConnected) {
+      await wahaRequest(`/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: "POST" });
+    }
+  }
+
+  return true;
+};
 
 const defaultWelcomeMessage = (tenant: { name: string; slug: string; settings: { brandName: string | null; welcomeMessage: string | null } | null }) =>
   tenant.settings?.welcomeMessage ||
@@ -561,6 +603,7 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   const normalizedCurrentWahaStatus = normalizeWahaStatus(currentWahaStatus);
 
   if (normalizedCurrentWahaStatus === "CONNECTED") {
+    await syncWahaWebhookConfig(sessionName, currentWahaSession);
     const connected = await updateSessionFromWahaStatus(session, "CONNECTED", { lastError: null });
 
     return mapSession(connected);
@@ -636,6 +679,31 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
     });
 
     return mapSession(updated);
+  }
+};
+
+export const syncConnectedSessionWebhooks = async () => {
+  const sessions = await prisma.whatsappSession.findMany({
+    where: { status: "CONNECTED" },
+    select: { tenantId: true, sessionName: true }
+  });
+
+  for (const session of sessions) {
+    try {
+      const changed = await syncWahaWebhookConfig(session.sessionName);
+
+      logWhatsapp("info", changed ? "WAHA webhook migrated" : "WAHA webhook already current", {
+        tenantId: session.tenantId,
+        sessionName: session.sessionName,
+        webhookHost: new URL(env.PUBLIC_BACKEND_URL).host
+      });
+    } catch (error) {
+      logWhatsapp("error", "WAHA webhook migration failed", {
+        tenantId: session.tenantId,
+        sessionName: session.sessionName,
+        error: getWahaErrorMessage(error)
+      });
+    }
   }
 };
 
@@ -1182,8 +1250,9 @@ const handleIncomingMessage = async (
   }
 
   if (!fromMe && messageCreated && session.autoReplyEnabled && body) {
+    const cooldownMs = Math.max(env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS, 2 * 60_000);
     const reservedAt = new Date();
-    const cooldownStartedAfter = new Date(reservedAt.getTime() - env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS);
+    const cooldownStartedAfter = new Date(reservedAt.getTime() - cooldownMs);
     const reservation = await prisma.whatsappConversation.updateMany({
       where: {
         id: conversation.id,
@@ -1206,8 +1275,8 @@ const handleIncomingMessage = async (
         sessionName: session.sessionName,
         chatId,
         elapsedMs: elapsedSinceLastAutoReply,
-        cooldownMs: env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS,
-        remainingMs: Math.max(0, env.WHATSAPP_AUTO_REPLY_COOLDOWN_MS - elapsedSinceLastAutoReply)
+        cooldownMs,
+        remainingMs: Math.max(0, cooldownMs - elapsedSinceLastAutoReply)
       });
       return;
     }
