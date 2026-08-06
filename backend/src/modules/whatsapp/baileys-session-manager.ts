@@ -330,10 +330,30 @@ export const startBaileysSession = async (tenantId: string, sessionId: string) =
 
 export const requestBaileysPairingCode = async (tenantId: string, sessionId: string, phoneNumber: string) => {
   const socket = await startBaileysSession(tenantId, sessionId);
-  const code = await socket.requestPairingCode(phoneNumber.replace(/\D/g, ""));
+  const cleanPhone = phoneNumber.replace(/\D/g, "");
+
+  if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 15) {
+    throw new AppError("Informe um numero de telefone valido com DDD para gerar o codigo.", 400);
+  }
+
+  // Se a conexao socket ainda nao recebeu o evento inicial de handshake com os servidores do WhatsApp,
+  // o Baileys lanca "Connection Closed" (HTTP 428 Precondition Required). Aguardamos ate 10s se necessario.
+  let attempts = 0;
+  while (!socket.ws?.isOpen && attempts < 20) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    attempts++;
+  }
+
+  if (!socket.ws?.isOpen) {
+    throw new AppError("A conexao com o servidor do WhatsApp ainda nao esta pronta. Tente novamente em alguns segundos.", 428);
+  }
+
+  const code = await socket.requestPairingCode(cleanPhone);
+  const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
+
   const updated = await updateBaileysSession(sessionId, {
     status: "PENDING_PAIRING_CODE",
-    pairingCode: code,
+    pairingCode: formattedCode,
     qrCode: null,
     lastPairingCodeAt: new Date(),
     lastStatusAt: new Date(),
@@ -342,6 +362,7 @@ export const requestBaileysPairingCode = async (tenantId: string, sessionId: str
 
   return mapSessionForSocket(updated);
 };
+
 
 export const stopBaileysSession = async (tenantId: string, sessionId: string, logout = false) => {
   const managed = sessions.get(sessionId);
