@@ -1,7 +1,7 @@
 import "./styles.css";
 import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, KeyRound, Loader2, MessageCircle, QrCode, RefreshCw, RotateCcw, Save, Send, Trash2, Wifi, WifiOff } from "lucide-react";
+import { Copy, FileText, KeyRound, Loader2, MessageCircle, RotateCcw, Save, Send, ShieldCheck, Trash2, Wifi, WifiOff } from "lucide-react";
 import { toast } from "react-toastify";
 import { useTenant } from "../../../app/providers/tenant-provider";
 import { PageHeader } from "../../../components/ui/page-header";
@@ -29,17 +29,16 @@ const triggerLabels: Record<string, string> = {
 
 const sessionStatusLabels: Record<string, string> = {
   CONNECTING: "Conectando",
-  PENDING_QR: "Aguardando QR",
   PENDING_PAIRING_CODE: "Aguardando codigo",
   CONNECTED: "Conectado",
   RECONNECTING: "Reconectando",
   DISCONNECTED: "Desconectado",
-  LOGGED_OUT: "Saiu da conta",
-  ERROR: "Erro"
+  LOGGED_OUT: "Desconectado pelo celular",
+  ERROR: "Erro de Conexao"
 };
 
 const shouldPollSession = (status?: string) =>
-  status ? ["CONNECTING", "PENDING_QR", "PENDING_PAIRING_CODE", "RECONNECTING"].includes(status) : false;
+  status ? ["CONNECTING", "PENDING_PAIRING_CODE", "RECONNECTING"].includes(status) : false;
 
 export function AdminWhatsapp() {
   const { tenant, settings } = useTenant();
@@ -47,7 +46,7 @@ export function AdminWhatsapp() {
   const whatsappQuery = useQuery({
     queryKey: ["tenant-whatsapp-session", tenant.id],
     queryFn: whatsappService.getSession,
-    refetchInterval: (query) => (shouldPollSession(query.state.data?.status) ? 5_000 : false)
+    refetchInterval: (query) => (shouldPollSession(query.state.data?.status) ? 4_000 : false)
   });
   const templatesQuery = useQuery({
     enabled: Boolean(whatsappQuery.data),
@@ -56,7 +55,7 @@ export function AdminWhatsapp() {
   });
   const [whatsappForm, setWhatsappForm] = useState({
     phone: settings.whatsapp ?? "",
-    message: "Mensagem de teste do podePedir."
+    message: "Mensagem de teste do PodePedir."
   });
   const [pairingPhone, setPairingPhone] = useState(settings.whatsapp ?? "");
   const [templateDrafts, setTemplateDrafts] = useState<Record<string, TemplateDraft>>({});
@@ -66,26 +65,20 @@ export function AdminWhatsapp() {
     onSuccess: async (session) => {
       queryClient.setQueryData(["tenant-whatsapp-session", tenant.id], session);
       await queryClient.invalidateQueries({ queryKey: ["tenant-whatsapp-templates", tenant.id] });
-      toast.success("Sessao WhatsApp criada. Leia o QR Code para conectar.");
+      toast.success("Sessao WhatsApp Baileys iniciada. Informe o numero do WhatsApp para gerar o codigo de pareamento.");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel iniciar o WhatsApp.")
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel iniciar a sessao.")
   });
-  const whatsappQrMutation = useMutation({
-    mutationFn: whatsappService.refreshQr,
-    onSuccess: (session) => {
-      queryClient.setQueryData(["tenant-whatsapp-session", tenant.id], session);
-      toast.success("QR Code atualizado.");
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel atualizar o QR Code.")
-  });
+
   const whatsappPairingMutation = useMutation({
-    mutationFn: whatsappService.requestPairingCode,
-    onSuccess: (session) => {
-      queryClient.setQueryData(["tenant-whatsapp-session", tenant.id], session);
-      toast.success("Codigo de pareamento gerado.");
+    mutationFn: (phoneNumber: string) => whatsappService.requestPairingCode(phoneNumber),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-whatsapp-session", tenant.id] });
+      toast.success(`Codigo gerado com sucesso: ${data.pairingCode}`);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel gerar o codigo.")
   });
+
   const whatsappStopMutation = useMutation({
     mutationFn: whatsappService.stopSession,
     onSuccess: async (session) => {
@@ -95,6 +88,7 @@ export function AdminWhatsapp() {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel desconectar o WhatsApp.")
   });
+
   const whatsappSettingsMutation = useMutation({
     mutationFn: whatsappService.updateSettings,
     onSuccess: (session) => {
@@ -103,26 +97,29 @@ export function AdminWhatsapp() {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel salvar as preferencias.")
   });
+
   const whatsappTestMutation = useMutation({
     mutationFn: whatsappService.sendTestMessage,
-    onSuccess: () => toast.success("Mensagem de teste enviada."),
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel enviar a mensagem.")
+    onSuccess: () => toast.success("Mensagem de teste enviada com sucesso!"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel enviar a mensagem de teste.")
   });
+
   const templateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: TemplateDraft }) => whatsappService.updateTemplate(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tenant-whatsapp-templates", tenant.id] });
-      toast.success("Mensagem salva.");
+      toast.success("Modelo de mensagem salvo.");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel salvar a mensagem.")
   });
+
   const templateDeleteMutation = useMutation({
     mutationFn: whatsappService.deleteTemplate,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tenant-whatsapp-templates", tenant.id] });
-      toast.success("Mensagem removida do envio automatico.");
+      toast.success("Mensagem desativada.");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel remover a mensagem.")
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel desativar a mensagem.")
   });
 
   useEffect(() => {
@@ -138,7 +135,6 @@ export function AdminWhatsapp() {
 
     setTemplateDrafts((current) => {
       const next = { ...current };
-
       for (const template of templatesQuery.data) {
         next[template.id] = next[template.id] ?? {
           title: template.title,
@@ -146,7 +142,6 @@ export function AdminWhatsapp() {
           enabled: template.enabled
         };
       }
-
       return next;
     });
   }, [templatesQuery.data]);
@@ -155,17 +150,21 @@ export function AdminWhatsapp() {
   const whatsappConnected = whatsappSession?.status === "CONNECTED";
   const whatsappBusy =
     whatsappStartMutation.isPending ||
-    whatsappQrMutation.isPending ||
     whatsappPairingMutation.isPending ||
     whatsappStopMutation.isPending ||
     whatsappSettingsMutation.isPending ||
     whatsappTestMutation.isPending;
 
+  const copyPairingCode = () => {
+    if (whatsappSession?.pairingCode) {
+      navigator.clipboard.writeText(whatsappSession.pairingCode.replace("-", ""));
+      toast.info("Codigo copiado para a area de transferencia!");
+    }
+  };
+
   const handleWhatsappSettingsSubmit = async (event: FormEvent) => {
     event.preventDefault();
-
     if (!whatsappSession) return;
-
     await whatsappSettingsMutation.mutateAsync({
       autoReplyEnabled: whatsappSession.autoReplyEnabled,
       notifyOrderStatus: whatsappSession.notifyOrderStatus
@@ -191,101 +190,119 @@ export function AdminWhatsapp() {
 
   const saveTemplate = (template: WhatsappMessageTemplate) => {
     const draft = templateDrafts[template.id];
-
     if (!draft) return;
-
     templateMutation.mutate({ id: template.id, payload: draft });
   };
 
   return (
     <section className="screen">
       <PageHeader
-        eyebrow="Atendimento"
-        title="WhatsApp"
-        description="Conecte o numero do restaurante para respostas automaticas e avisos de pedido."
-        actions={whatsappConnected ? <span className="connection">Conectado</span> : null}
+        eyebrow="Atendimento Automatico"
+        title="WhatsApp Bot (Baileys Nativo)"
+        description="Conecte seu WhatsApp sem precisar de QR Code, utilizando o codigo de pareamento direto de 8 digitos."
+        actions={
+          whatsappConnected ? (
+            <span className="badge connected">
+              <ShieldCheck size={16} /> Conectado
+            </span>
+          ) : (
+            <span className="badge disconnected">
+              <WifiOff size={16} /> Desconectado
+            </span>
+          )
+        }
       />
 
       <div className="whatsapp-grid">
         <article className="panel whatsapp-panel">
           <div className="whatsapp-heading">
             <div>
-              <h2>Sessao</h2>
-              <p className="muted-text">Use o QR Code para autenticar a conta do restaurante.</p>
+              <h2>Conexao por Pairing Code</h2>
+              <p className="muted-text">
+                Insira o numero do WhatsApp do restaurante (com DDD) para solicitar o codigo de pareamento de 8 digitos.
+              </p>
             </div>
-            {whatsappConnected ? <Wifi size={20} /> : <WifiOff size={20} />}
+            {whatsappConnected ? <Wifi size={22} className="text-success" /> : <WifiOff size={22} className="text-muted" />}
           </div>
 
           <div className={`whatsapp-status ${whatsappConnected ? "connected" : ""}`}>
             <div>
-              <span>Status</span>
-              <strong>{whatsappQuery.isLoading ? "Carregando" : sessionStatusLabels[whatsappSession?.status ?? ""] ?? "Nao configurado"}</strong>
+              <span>Status da Conexao:</span>
+              <strong>{whatsappQuery.isLoading ? "Verificando..." : sessionStatusLabels[whatsappSession?.status ?? ""] ?? "Nao configurado"}</strong>
             </div>
-            {whatsappSession?.sessionName && <code>{whatsappSession.provider ?? "WAHA"} - {whatsappSession.sessionName}</code>}
+            {whatsappSession?.phoneNumber && <code>+{whatsappSession.phoneNumber}</code>}
           </div>
 
           {whatsappSession?.lastError && <p className="form-error">{whatsappSession.lastError}</p>}
-          {whatsappSession?.status === "PENDING_QR" && !whatsappSession.lastError ? (
-            <p className="muted-text">Aguardando leitura ou atualizacao do QR Code.</p>
-          ) : null}
 
-          {whatsappSession?.qrCode ? (
-            <div className="whatsapp-qr">
-              <img src={whatsappSession.qrCode} alt="QR Code para conectar WhatsApp" />
-            </div>
-          ) : (
-            <div className="whatsapp-qr empty">
-              <QrCode size={34} />
-            </div>
-          )}
-
-          {whatsappSession?.provider === "BAILEYS" ? (
+          {!whatsappConnected && (
             <div className="pairing-code-box">
               <label className="field">
-                <span>Telefone para codigo</span>
+                <span>Numero do WhatsApp (com DDD)</span>
                 <div>
-                  <input onChange={(event) => setPairingPhone(event.target.value)} value={pairingPhone} />
+                  <input
+                    placeholder="Ex: 11999998888"
+                    onChange={(event) => setPairingPhone(event.target.value)}
+                    value={pairingPhone}
+                  />
                 </div>
               </label>
-              {whatsappSession.pairingCode ? (
-                <div className="pairing-code-value">
-                  <span>Codigo</span>
-                  <strong>{whatsappSession.pairingCode}</strong>
+
+              {whatsappSession?.pairingCode && (
+                <div className="pairing-code-card">
+                  <span>Seu Codigo de Pareamento:</span>
+                  <div className="pairing-code-display" onClick={copyPairingCode}>
+                    <strong>{whatsappSession.pairingCode}</strong>
+                    <button type="button" className="icon-only-button" title="Copiar Codigo">
+                      <Copy size={18} />
+                    </button>
+                  </div>
+                  <div className="pairing-instructions">
+                    <p><strong>Passo a passo no seu celular:</strong></p>
+                    <ol>
+                      <li>Abra o <strong>WhatsApp</strong> no celular do restaurante</li>
+                      <li>Toque em <strong>Configuracoes</strong> ou nos tres pontos &gt; <strong>Dispositivos Conectados</strong></li>
+                      <li>Toque em <strong>Vincular um dispositivo</strong></li>
+                      <li>Selecione <strong>Conectar com numero de telefone</strong> abaixo do scanner</li>
+                      <li>Digite o codigo de 8 digitos acima</li>
+                    </ol>
+                  </div>
                 </div>
-              ) : null}
+              )}
+
               <button
-                className="ghost-icon-button"
-                disabled={!whatsappSession || whatsappBusy || whatsappConnected}
-                onClick={() => whatsappPairingMutation.mutate({ phoneNumber: pairingPhone })}
+                className="primary-button full-width"
+                disabled={whatsappBusy || !pairingPhone}
+                onClick={() => whatsappPairingMutation.mutate(pairingPhone)}
                 type="button"
               >
                 {whatsappPairingMutation.isPending ? <Loader2 className="spin" size={18} /> : <KeyRound size={18} />}
-                Gerar codigo
+                Gerar Codigo de Pareamento (8 digitos)
               </button>
             </div>
-          ) : null}
+          )}
 
           <div className="whatsapp-actions">
-            <button className="primary-button" disabled={whatsappBusy} onClick={() => whatsappStartMutation.mutate()} type="button">
-              {whatsappStartMutation.isPending ? <Loader2 className="spin" size={18} /> : <MessageCircle size={18} />}
-              {whatsappSession ? "Reconectar" : "Criar sessao"}
-            </button>
-            <button className="ghost-icon-button" disabled={!whatsappSession || whatsappBusy} onClick={() => whatsappQrMutation.mutate()} type="button">
-              {whatsappQrMutation.isPending ? <Loader2 className="spin" size={18} /> : <RefreshCw size={18} />}
-              Atualizar QR
-            </button>
-            <button className="ghost-icon-button" disabled={!whatsappSession || whatsappBusy} onClick={() => whatsappStopMutation.mutate()} type="button">
-              <WifiOff size={18} />
-              Desconectar
-            </button>
+            {!whatsappSession && (
+              <button className="primary-button" disabled={whatsappBusy} onClick={() => whatsappStartMutation.mutate()} type="button">
+                {whatsappStartMutation.isPending ? <Loader2 className="spin" size={18} /> : <MessageCircle size={18} />}
+                Iniciar Nova Sessao
+              </button>
+            )}
+            {whatsappSession && (
+              <button className="ghost-icon-button danger-action" disabled={whatsappBusy} onClick={() => whatsappStopMutation.mutate()} type="button">
+                <WifiOff size={18} />
+                Desconectar WhatsApp
+              </button>
+            )}
           </div>
         </article>
 
         <article className="panel whatsapp-panel">
           <div className="whatsapp-heading">
             <div>
-              <h2>Bot e notificacoes</h2>
-              <p className="muted-text">Defina como o app conversa com clientes durante o pedido.</p>
+              <h2>Preferencias do Bot</h2>
+              <p className="muted-text">Ative ou desative as automacoes de atendimento.</p>
             </div>
             <MessageCircle size={20} />
           </div>
@@ -303,7 +320,7 @@ export function AdminWhatsapp() {
                   }
                   type="checkbox"
                 />
-                <span>Responder automaticamente novas mensagens</span>
+                <span>Responder automaticamente com mensagem de boas-vindas</span>
               </label>
               <label className="toggle-row">
                 <input
@@ -316,18 +333,17 @@ export function AdminWhatsapp() {
                   }
                   type="checkbox"
                 />
-                <span>Enviar avisos quando o status do pedido mudar</span>
+                <span>Notificar cliente via WhatsApp quando o status do pedido mudar</span>
               </label>
               <button className="primary-button" disabled={whatsappSettingsMutation.isPending} type="submit">
                 {whatsappSettingsMutation.isPending ? <Loader2 className="spin" size={18} /> : <Save size={18} />}
-                Salvar preferencias
+                Salvar Preferencias
               </button>
             </form>
           ) : (
             <div className="whatsapp-empty">
-              <QrCode size={28} />
-              <strong>Crie uma sessao para configurar o bot</strong>
-              <span>As preferencias ficam disponiveis depois que o tenant tiver uma sessao.</span>
+              <MessageCircle size={28} />
+              <strong>Inicie a sessao para configurar o bot</strong>
             </div>
           )}
         </article>
@@ -335,8 +351,8 @@ export function AdminWhatsapp() {
         <article className="panel whatsapp-templates-panel">
           <div className="whatsapp-heading">
             <div>
-              <h2>Mensagens automaticas</h2>
-              <p className="muted-text">Edite o texto enviado em cada momento do atendimento e do pedido.</p>
+              <h2>Modelos de Mensagens</h2>
+              <p className="muted-text">Personalize o texto enviado em cada etapa do pedido.</p>
             </div>
             <FileText size={20} />
           </div>
@@ -352,7 +368,7 @@ export function AdminWhatsapp() {
           {templatesQuery.isLoading ? (
             <div className="whatsapp-empty">
               <Loader2 className="spin" size={24} />
-              <strong>Carregando mensagens</strong>
+              <strong>Carregando modelos...</strong>
             </div>
           ) : templatesQuery.data?.length ? (
             <div className="template-list">
@@ -379,7 +395,7 @@ export function AdminWhatsapp() {
                           onChange={(event) => updateTemplateDraft(template, { enabled: event.target.checked })}
                           type="checkbox"
                         />
-                        <span>{draft.enabled ? "Ativa" : "Inativa"}</span>
+                        <span>{draft.enabled ? "Ativo" : "Inativo"}</span>
                       </label>
                     </div>
                     <textarea
@@ -394,7 +410,7 @@ export function AdminWhatsapp() {
                       {draft.enabled ? (
                         <button className="ghost-icon-button danger-action" disabled={templateDeleteMutation.isPending} onClick={() => templateDeleteMutation.mutate(template.id)} type="button">
                           <Trash2 size={16} />
-                          Excluir
+                          Desativar
                         </button>
                       ) : (
                         <button className="ghost-icon-button" disabled={templateMutation.isPending} onClick={() => templateMutation.mutate({ id: template.id, payload: { ...draft, enabled: true } })} type="button">
@@ -409,28 +425,27 @@ export function AdminWhatsapp() {
             </div>
           ) : (
             <div className="whatsapp-empty">
-              <QrCode size={28} />
-              <strong>Crie uma sessao para editar mensagens</strong>
-              <span>Os modelos aparecem depois que o tenant tiver uma sessao WhatsApp.</span>
+              <FileText size={28} />
+              <strong>Crie uma sessao para personalizar modelos</strong>
             </div>
           )}
         </article>
 
         <form className="panel whatsapp-test" onSubmit={handleWhatsappTestSubmit}>
-          <h2>Teste de envio</h2>
+          <h2>Teste de Envio</h2>
           <label className="field">
-            <span>Telefone para teste</span>
+            <span>Telefone Destino (com DDD)</span>
             <div>
               <input onChange={(event) => setWhatsappForm((current) => ({ ...current, phone: event.target.value }))} value={whatsappForm.phone} />
             </div>
           </label>
           <label className="field">
-            <span>Mensagem</span>
+            <span>Mensagem de Teste</span>
             <textarea onChange={(event) => setWhatsappForm((current) => ({ ...current, message: event.target.value }))} value={whatsappForm.message} />
           </label>
           <button className="primary-button" disabled={!whatsappConnected || whatsappTestMutation.isPending} type="submit">
             {whatsappTestMutation.isPending ? <Loader2 className="spin" size={18} /> : <Send size={18} />}
-            Enviar teste
+            Enviar Mensagem de Teste
           </button>
         </form>
       </div>

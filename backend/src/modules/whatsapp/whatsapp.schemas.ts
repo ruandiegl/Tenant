@@ -17,7 +17,11 @@ export const whatsappTestMessageSchema = z.object({
 
 export const whatsappPairingCodeSchema = z.object({
   body: z.object({
-    phoneNumber: z.string().min(10).max(20)
+    phoneNumber: z
+      .string({ required_error: "Informe o telefone do WhatsApp para gerar o codigo." })
+      .trim()
+      .min(10, "Informe o telefone com DDD para gerar o codigo.")
+      .max(20, "Informe um telefone valido para gerar o codigo.")
   })
 });
 

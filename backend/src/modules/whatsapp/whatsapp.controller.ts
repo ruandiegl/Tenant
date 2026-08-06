@@ -17,17 +17,10 @@ export const createOrStartSession: RequestHandler = async (req, res, next) => {
   }
 };
 
-export const refreshQr: RequestHandler = async (req, res, next) => {
-  try {
-    return res.json(await service.refreshSessionQr(req.tenantId!));
-  } catch (error) {
-    return next(error);
-  }
-};
-
 export const requestPairingCode: RequestHandler = async (req, res, next) => {
   try {
-    return res.json(await service.requestPairingCode(req.tenantId!, req.body.phoneNumber));
+    const { phoneNumber } = req.body;
+    return res.json(await service.requestPairingCode(req.tenantId!, phoneNumber));
   } catch (error) {
     return next(error);
   }
@@ -59,7 +52,7 @@ export const sendTestMessage: RequestHandler = async (req, res, next) => {
 
 export const getHealth: RequestHandler = async (req, res, next) => {
   try {
-    return res.json(await service.getWahaConnectivityHealth(req.tenantId!));
+    return res.json(await service.getConnectivityHealth(req.tenantId!));
   } catch (error) {
     return next(error);
   }
@@ -93,21 +86,6 @@ export const updateTemplate: RequestHandler = async (req, res, next) => {
 export const deleteTemplate: RequestHandler = async (req, res, next) => {
   try {
     return res.json(await service.deleteTemplate(req.tenantId!, req.params.id));
-  } catch (error) {
-    return next(error);
-  }
-};
-
-export const webhook: RequestHandler = async (req, res, next) => {
-  try {
-    return res.json(
-      await service.handleWebhook(
-        req.body,
-        req.rawBody,
-        req.headers,
-        typeof req.query.secret === "string" ? req.query.secret : undefined
-      )
-    );
   } catch (error) {
     return next(error);
   }

@@ -354,6 +354,8 @@ export const stopBaileysSession = async (tenantId: string, sessionId: string, lo
     if (logout) {
       await managed.socket.logout("PodePedir logout requested").catch(() => undefined);
       await prisma.whatsappAuthState.deleteMany({ where: { sessionId } });
+    } else {
+      await managed.socket.end(undefined).catch(() => undefined);
     }
   } else if (logout) {
     await prisma.whatsappAuthState.deleteMany({ where: { sessionId } });
@@ -369,6 +371,34 @@ export const stopBaileysSession = async (tenantId: string, sessionId: string, lo
     lastStatusAt: new Date(),
     lastError: null
   });
+
+  return mapSessionForSocket(updated);
+};
+
+export const restartBaileysSessionForQr = async (tenantId: string, sessionId: string) => {
+  const managed = sessions.get(sessionId);
+
+  if (managed) {
+    managed.stopped = true;
+    clearReconnectTimer(managed);
+    sessions.delete(sessionId);
+    await managed.socket.end(undefined).catch(() => undefined);
+  }
+
+  await updateBaileysSession(sessionId, {
+    status: "CONNECTING",
+    qrCode: null,
+    pairingCode: null,
+    lastStatusAt: new Date(),
+    lastError: null
+  });
+
+  await startBaileysSession(tenantId, sessionId);
+  const updated = await prisma.whatsappSession.findUnique({ where: { id: sessionId } });
+
+  if (!updated) {
+    throw new AppError("Baileys session not found", 404);
+  }
 
   return mapSessionForSocket(updated);
 };

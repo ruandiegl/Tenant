@@ -6,6 +6,7 @@ import { getSocketServer } from "../../config/socket.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import {
   requestBaileysPairingCode,
+  restartBaileysSessionForQr,
   sendBaileysTextMessage,
   setBaileysIncomingMessageHandler,
   startBaileysSession,
@@ -400,6 +401,34 @@ const ensureDefaultTemplates = async (tenantId: string, sessionId: string) => {
   );
 };
 
+const alignSessionWithConfiguredProvider = async (session: NonNullable<Awaited<ReturnType<typeof prisma.whatsappSession.findUnique>>>) => {
+  if (env.WHATSAPP_PROVIDER !== "BAILEYS" || session.provider === "BAILEYS") {
+    return session;
+  }
+
+  const updated = await prisma.whatsappSession.update({
+    where: { id: session.id },
+    data: {
+      provider: "BAILEYS",
+      status: "DISCONNECTED",
+      qrCode: null,
+      pairingCode: null,
+      phoneNumber: null,
+      displayName: null,
+      lastStatusAt: new Date(),
+      lastError: null
+    }
+  });
+
+  logWhatsapp("info", "session provider switched to Baileys by environment", {
+    tenantId: updated.tenantId,
+    sessionName: updated.sessionName
+  });
+  emitSessionUpdate(updated);
+
+  return updated;
+};
+
 const getRenderedTemplate = async (sessionId: string, trigger: WhatsappTemplateTrigger, variables: TemplateVariables) => {
   const template = await prisma.whatsappMessageTemplate.findUnique({
     where: { sessionId_trigger: { sessionId, trigger } }
@@ -520,11 +549,14 @@ const mapTemplate = (template: Awaited<ReturnType<typeof prisma.whatsappMessageT
     : null;
 
 export const getSession = async (tenantId: string) => {
-  const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const foundSession = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const currentSession = foundSession ? await alignSessionWithConfiguredProvider(foundSession) : null;
 
-  if (!session) {
+  if (!currentSession) {
     return null;
   }
+
+  const session = await alignSessionWithConfiguredProvider(currentSession);
 
   if (session.provider === "BAILEYS") {
     await ensureDefaultTemplates(tenantId, session.id);
@@ -758,7 +790,8 @@ export const requestPairingCode = async (tenantId: string, phoneNumber: string) 
     await createOrStartSession(tenantId);
   }
 
-  const currentSession = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const foundSession = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const currentSession = foundSession ? await alignSessionWithConfiguredProvider(foundSession) : null;
 
   if (!currentSession) {
     throw new AppError("WhatsApp session not found", 404);
@@ -774,21 +807,19 @@ export const requestPairingCode = async (tenantId: string, phoneNumber: string) 
 };
 
 export const refreshSessionQr = async (tenantId: string): Promise<ReturnType<typeof mapSession>> => {
-  const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const foundSession = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const session = foundSession ? await alignSessionWithConfiguredProvider(foundSession) : null;
 
   if (!session) {
     throw new AppError("WhatsApp session not found", 404);
   }
 
   if (session.provider === "BAILEYS") {
-    if (!["CONNECTED", "PENDING_QR", "CONNECTING", "RECONNECTING", "PENDING_PAIRING_CODE"].includes(session.status)) {
-      await startBaileysSession(tenantId, session.id);
-    } else if (!session.qrCode && session.status !== "CONNECTED") {
-      await startBaileysSession(tenantId, session.id);
+    if (session.status === "CONNECTED") {
+      return mapSession(session);
     }
 
-    const updated = await prisma.whatsappSession.findUnique({ where: { id: session.id } });
-    return mapSession(updated);
+    return restartBaileysSessionForQr(tenantId, session.id);
   }
 
   const syncedSession = await syncSessionStatusFromWaha(session).catch(async (error) => {
@@ -875,7 +906,8 @@ export const refreshSessionQr = async (tenantId: string): Promise<ReturnType<typ
 };
 
 export const stopSession = async (tenantId: string) => {
-  const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const foundSession = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const session = foundSession ? await alignSessionWithConfiguredProvider(foundSession) : null;
 
   if (!session) {
     throw new AppError("WhatsApp session not found", 404);
@@ -927,7 +959,8 @@ export const updateSettings = async (tenantId: string, data: SessionSettingsInpu
 };
 
 export const getWahaConnectivityHealth = async (tenantId: string) => {
-  const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const foundSession = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const session = foundSession ? await alignSessionWithConfiguredProvider(foundSession) : null;
   const startedAt = Date.now();
 
   if (session?.provider === "BAILEYS") {
@@ -1009,8 +1042,11 @@ export const getWahaConnectivityHealth = async (tenantId: string) => {
   }
 };
 
+export const getConnectivityHealth = getWahaConnectivityHealth;
+
 export const sendTextMessage = async (tenantId: string, phone: string, text: string, options: SendTextMessageOptions = {}) => {
-  const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const foundSession = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+  const session = foundSession ? await alignSessionWithConfiguredProvider(foundSession) : null;
 
   if (!session) {
     throw new AppError("WhatsApp session not found", 404);
