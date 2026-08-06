@@ -1,19 +1,33 @@
+SET lock_timeout = '15s';
+SET statement_timeout = '120s';
+
 ALTER TYPE "WhatsappSessionStatus" ADD VALUE IF NOT EXISTS 'CONNECTING';
 ALTER TYPE "WhatsappSessionStatus" ADD VALUE IF NOT EXISTS 'PENDING_PAIRING_CODE';
 ALTER TYPE "WhatsappSessionStatus" ADD VALUE IF NOT EXISTS 'RECONNECTING';
 ALTER TYPE "WhatsappSessionStatus" ADD VALUE IF NOT EXISTS 'LOGGED_OUT';
 
-CREATE TYPE "WhatsappProvider" AS ENUM ('WAHA', 'BAILEYS');
-CREATE TYPE "WhatsappMessageQueueStatus" AS ENUM ('PENDING', 'PROCESSING', 'SENT', 'FAILED', 'CANCELLED');
+DO $$
+BEGIN
+  CREATE TYPE "WhatsappProvider" AS ENUM ('WAHA', 'BAILEYS');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE TYPE "WhatsappMessageQueueStatus" AS ENUM ('PENDING', 'PROCESSING', 'SENT', 'FAILED', 'CANCELLED');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 ALTER TABLE "WhatsappSession"
-  ADD COLUMN "provider" "WhatsappProvider" NOT NULL DEFAULT 'WAHA',
-  ADD COLUMN "pairingCode" TEXT,
-  ADD COLUMN "lastQrAt" TIMESTAMP(3),
-  ADD COLUMN "lastPairingCodeAt" TIMESTAMP(3),
-  ADD COLUMN "connectionAttempts" INTEGER NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS "provider" "WhatsappProvider" NOT NULL DEFAULT 'WAHA',
+  ADD COLUMN IF NOT EXISTS "pairingCode" TEXT,
+  ADD COLUMN IF NOT EXISTS "lastQrAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "lastPairingCodeAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "connectionAttempts" INTEGER NOT NULL DEFAULT 0;
 
-CREATE TABLE "WhatsappAuthState" (
+CREATE TABLE IF NOT EXISTS "WhatsappAuthState" (
   "id" TEXT NOT NULL,
   "tenantId" TEXT NOT NULL,
   "sessionId" TEXT NOT NULL,
@@ -25,7 +39,7 @@ CREATE TABLE "WhatsappAuthState" (
   CONSTRAINT "WhatsappAuthState_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "WhatsappMessageQueue" (
+CREATE TABLE IF NOT EXISTS "WhatsappMessageQueue" (
   "id" TEXT NOT NULL,
   "tenantId" TEXT NOT NULL,
   "sessionId" TEXT NOT NULL,
@@ -47,20 +61,30 @@ CREATE TABLE "WhatsappMessageQueue" (
   CONSTRAINT "WhatsappMessageQueue_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "WhatsappAuthState_sessionId_key_key" ON "WhatsappAuthState"("sessionId", "key");
-CREATE INDEX "WhatsappAuthState_tenantId_idx" ON "WhatsappAuthState"("tenantId");
-CREATE INDEX "WhatsappAuthState_sessionId_idx" ON "WhatsappAuthState"("sessionId");
+CREATE UNIQUE INDEX IF NOT EXISTS "WhatsappAuthState_sessionId_key_key" ON "WhatsappAuthState"("sessionId", "key");
+CREATE INDEX IF NOT EXISTS "WhatsappAuthState_tenantId_idx" ON "WhatsappAuthState"("tenantId");
+CREATE INDEX IF NOT EXISTS "WhatsappAuthState_sessionId_idx" ON "WhatsappAuthState"("sessionId");
 
-CREATE UNIQUE INDEX "WhatsappMessageQueue_idempotencyKey_key" ON "WhatsappMessageQueue"("idempotencyKey");
-CREATE INDEX "WhatsappMessageQueue_tenantId_status_idx" ON "WhatsappMessageQueue"("tenantId", "status");
-CREATE INDEX "WhatsappMessageQueue_sessionId_status_availableAt_idx" ON "WhatsappMessageQueue"("sessionId", "status", "availableAt");
+CREATE UNIQUE INDEX IF NOT EXISTS "WhatsappMessageQueue_idempotencyKey_key" ON "WhatsappMessageQueue"("idempotencyKey");
+CREATE INDEX IF NOT EXISTS "WhatsappMessageQueue_tenantId_status_idx" ON "WhatsappMessageQueue"("tenantId", "status");
+CREATE INDEX IF NOT EXISTS "WhatsappMessageQueue_sessionId_status_availableAt_idx" ON "WhatsappMessageQueue"("sessionId", "status", "availableAt");
 
-CREATE INDEX "WhatsappSession_provider_status_idx" ON "WhatsappSession"("provider", "status");
+CREATE INDEX IF NOT EXISTS "WhatsappSession_provider_status_idx" ON "WhatsappSession"("provider", "status");
 
-ALTER TABLE "WhatsappAuthState"
-  ADD CONSTRAINT "WhatsappAuthState_sessionId_fkey"
-  FOREIGN KEY ("sessionId") REFERENCES "WhatsappSession"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+  ALTER TABLE "WhatsappAuthState"
+    ADD CONSTRAINT "WhatsappAuthState_sessionId_fkey"
+    FOREIGN KEY ("sessionId") REFERENCES "WhatsappSession"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-ALTER TABLE "WhatsappMessageQueue"
-  ADD CONSTRAINT "WhatsappMessageQueue_sessionId_fkey"
-  FOREIGN KEY ("sessionId") REFERENCES "WhatsappSession"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+  ALTER TABLE "WhatsappMessageQueue"
+    ADD CONSTRAINT "WhatsappMessageQueue_sessionId_fkey"
+    FOREIGN KEY ("sessionId") REFERENCES "WhatsappSession"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
