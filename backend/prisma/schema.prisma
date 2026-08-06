@@ -76,15 +76,32 @@ enum OrderSource {
 }
 
 enum WhatsappSessionStatus {
+  CONNECTING
   PENDING_QR
+  PENDING_PAIRING_CODE
   CONNECTED
+  RECONNECTING
   DISCONNECTED
+  LOGGED_OUT
   ERROR
+}
+
+enum WhatsappProvider {
+  WAHA
+  BAILEYS
 }
 
 enum WhatsappMessageDirection {
   INBOUND
   OUTBOUND
+}
+
+enum WhatsappMessageQueueStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
 }
 
 enum WhatsappTemplateTrigger {
@@ -987,24 +1004,47 @@ model WhatsappSession {
   tenantId          String                    @unique
   tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessionName       String                    @unique
+  provider          WhatsappProvider          @default(WAHA)
   phoneNumber       String?
   displayName       String?
   status            WhatsappSessionStatus     @default(DISCONNECTED)
   qrCode            String?                   @db.Text
+  pairingCode       String?
   autoReplyEnabled  Boolean                   @default(true)
   notifyOrderStatus Boolean                   @default(true)
   welcomeMessage    String?                   @db.Text
   lastStatusAt      DateTime?
+  lastQrAt          DateTime?
+  lastPairingCodeAt DateTime?
   connectedAt       DateTime?
   disconnectedAt    DateTime?
+  connectionAttempts Int                      @default(0)
   lastError         String?
+  authStates        WhatsappAuthState[]
   conversations     WhatsappConversation[]
   messages          WhatsappMessage[]
+  queueItems        WhatsappMessageQueue[]
   templates         WhatsappMessageTemplate[]
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
 
   @@index([tenantId, status])
+  @@index([provider, status])
+}
+
+model WhatsappAuthState {
+  id        String          @id @default(cuid())
+  tenantId  String
+  sessionId String
+  session   WhatsappSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  key       String
+  value     Json
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([sessionId, key])
+  @@index([tenantId])
+  @@index([sessionId])
 }
 
 model WhatsappConversation {
@@ -1051,6 +1091,31 @@ model WhatsappMessage {
   @@unique([sessionId, externalId])
   @@index([tenantId, chatId, createdAt])
   @@index([conversationId, createdAt])
+}
+
+model WhatsappMessageQueue {
+  id               String                     @id @default(cuid())
+  tenantId         String
+  sessionId        String
+  session          WhatsappSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  conversationId   String?
+  idempotencyKey   String
+  to               String
+  body             String                     @db.Text
+  status           WhatsappMessageQueueStatus @default(PENDING)
+  attempts         Int                        @default(0)
+  availableAt      DateTime                   @default(now())
+  processingAt     DateTime?
+  sentAt           DateTime?
+  failedAt         DateTime?
+  lastErrorCode    String?
+  lastErrorMessage String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  @@unique([idempotencyKey])
+  @@index([tenantId, status])
+  @@index([sessionId, status, availableAt])
 }
 
 model WhatsappMessageTemplate {

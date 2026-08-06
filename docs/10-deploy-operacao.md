@@ -76,6 +76,7 @@ PUBLIC_BACKEND_URL
 WAHA_BASE_URL
 WAHA_API_KEY
 WAHA_WEBHOOK_SECRET
+WHATSAPP_PROVIDER
 ```
 
 Frontend:
@@ -113,6 +114,24 @@ Cuidados:
 - Webhooks devem apontar para `PUBLIC_BACKEND_URL/public/webhooks/waha`, nao para o dominio publico do proprio WAHA.
 - Eventos esperados para sessao/mensagens: `session.status`, `message` e `message.any`.
 - Nao configure evento `qr` sem confirmar suporte da versao do WAHA em uso. A imagem observada em producao rejeita `qr` com HTTP 400; o QR deve ser buscado pela API em `/api/{session}/auth/qr`.
+
+## WhatsApp com Baileys
+
+O backend suporta migracao gradual do WhatsApp por provider:
+
+```txt
+WHATSAPP_PROVIDER=WAHA
+WHATSAPP_PROVIDER=BAILEYS
+```
+
+Cuidados:
+
+- O default seguro continua sendo `WAHA`; use `BAILEYS` apenas em loja piloto ate validar estabilidade.
+- Baileys roda dentro do processo Node.js do backend e persiste auth state no PostgreSQL via Prisma.
+- A sessao Baileys nao depende do volume do WAHA, mas depende das migrations aplicadas.
+- Com mais de uma replica do backend, garanta que apenas uma instancia gerencie a mesma sessao ou implemente lock operacional antes do rollout amplo.
+- Pareamento Baileys pode usar QR Code ou `POST /tenant/whatsapp/session/pairing-code`.
+- Nao remova o service WAHA enquanto ainda houver tenant com provider `WAHA` ou enquanto o rollback por tenant ainda for necessario.
 
 ## Checklist de deploy
 

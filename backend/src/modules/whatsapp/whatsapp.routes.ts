@@ -5,6 +5,7 @@ import { authMiddleware, requirePermission } from "../auth/auth.middleware.js";
 import * as controller from "./whatsapp.controller.js";
 import {
   whatsappMessageDeleteSchema,
+  whatsappPairingCodeSchema,
   whatsappSettingsSchema,
   whatsappTemplateDeleteSchema,
   whatsappTemplateUpdateSchema,
@@ -19,6 +20,7 @@ tenantWhatsappRoutes.get("/health", requirePermission("tenant.settings.read"), c
 tenantWhatsappRoutes.get("/session", requirePermission("tenant.settings.read"), controller.getSession);
 tenantWhatsappRoutes.post("/session", requirePermission("tenant.settings.write"), controller.createOrStartSession);
 tenantWhatsappRoutes.post("/session/qr", requirePermission("tenant.settings.write"), controller.refreshQr);
+tenantWhatsappRoutes.post("/session/pairing-code", requirePermission("tenant.settings.write"), validate(whatsappPairingCodeSchema), controller.requestPairingCode);
 tenantWhatsappRoutes.post("/session/stop", requirePermission("tenant.settings.write"), controller.stopSession);
 tenantWhatsappRoutes.patch("/session/settings", requirePermission("tenant.settings.write"), validate(whatsappSettingsSchema), controller.updateSettings);
 tenantWhatsappRoutes.post("/messages/test", requirePermission("tenant.settings.write"), validate(whatsappTestMessageSchema), controller.sendTestMessage);

@@ -25,6 +25,14 @@ export const refreshQr: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const requestPairingCode: RequestHandler = async (req, res, next) => {
+  try {
+    return res.json(await service.requestPairingCode(req.tenantId!, req.body.phoneNumber));
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const stopSession: RequestHandler = async (req, res, next) => {
   try {
     return res.json(await service.stopSession(req.tenantId!));

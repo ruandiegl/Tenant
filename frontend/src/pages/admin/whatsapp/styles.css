@@ -98,6 +98,37 @@
   gap: 10px;
 }
 
+.pairing-code-box {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.pairing-code-value {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.pairing-code-value span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.pairing-code-value strong {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+}
+
 .whatsapp-templates-panel {
   grid-column: 1 / -1;
 }

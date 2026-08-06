@@ -11,6 +11,11 @@ export const whatsappService = {
     protectedApi<WhatsappSession>("/tenant/whatsapp/session/qr", {
       method: "POST"
     }),
+  requestPairingCode: (payload: { phoneNumber: string }) =>
+    protectedApi<WhatsappSession>("/tenant/whatsapp/session/pairing-code", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
   stopSession: () =>
     protectedApi<WhatsappSession>("/tenant/whatsapp/session/stop", {
       method: "POST"

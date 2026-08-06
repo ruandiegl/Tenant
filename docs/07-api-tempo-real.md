@@ -132,6 +132,7 @@ WhatsApp:
 GET /tenant/whatsapp/session
 POST /tenant/whatsapp/session
 POST /tenant/whatsapp/session/qr
+POST /tenant/whatsapp/session/pairing-code
 POST /tenant/whatsapp/session/stop
 PATCH /tenant/whatsapp/session/settings
 POST /tenant/whatsapp/messages/test

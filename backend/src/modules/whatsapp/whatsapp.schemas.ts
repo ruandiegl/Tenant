@@ -15,6 +15,12 @@ export const whatsappTestMessageSchema = z.object({
   })
 });
 
+export const whatsappPairingCodeSchema = z.object({
+  body: z.object({
+    phoneNumber: z.string().min(10).max(20)
+  })
+});
+
 export const whatsappMessageDeleteSchema = z.object({
   params: z.object({
     id: z.string().min(1)

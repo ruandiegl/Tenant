@@ -1,7 +1,7 @@
 import "./styles.css";
 import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Loader2, MessageCircle, QrCode, RefreshCw, RotateCcw, Save, Send, Trash2, Wifi, WifiOff } from "lucide-react";
+import { FileText, KeyRound, Loader2, MessageCircle, QrCode, RefreshCw, RotateCcw, Save, Send, Trash2, Wifi, WifiOff } from "lucide-react";
 import { toast } from "react-toastify";
 import { useTenant } from "../../../app/providers/tenant-provider";
 import { PageHeader } from "../../../components/ui/page-header";
@@ -27,13 +27,27 @@ const triggerLabels: Record<string, string> = {
   ORDER_REJECTED: "Recusado"
 };
 
+const sessionStatusLabels: Record<string, string> = {
+  CONNECTING: "Conectando",
+  PENDING_QR: "Aguardando QR",
+  PENDING_PAIRING_CODE: "Aguardando codigo",
+  CONNECTED: "Conectado",
+  RECONNECTING: "Reconectando",
+  DISCONNECTED: "Desconectado",
+  LOGGED_OUT: "Saiu da conta",
+  ERROR: "Erro"
+};
+
+const shouldPollSession = (status?: string) =>
+  status ? ["CONNECTING", "PENDING_QR", "PENDING_PAIRING_CODE", "RECONNECTING"].includes(status) : false;
+
 export function AdminWhatsapp() {
   const { tenant, settings } = useTenant();
   const queryClient = useQueryClient();
   const whatsappQuery = useQuery({
     queryKey: ["tenant-whatsapp-session", tenant.id],
     queryFn: whatsappService.getSession,
-    refetchInterval: (query) => (query.state.data?.status === "PENDING_QR" ? 10_000 : false)
+    refetchInterval: (query) => (shouldPollSession(query.state.data?.status) ? 5_000 : false)
   });
   const templatesQuery = useQuery({
     enabled: Boolean(whatsappQuery.data),
@@ -44,6 +58,7 @@ export function AdminWhatsapp() {
     phone: settings.whatsapp ?? "",
     message: "Mensagem de teste do podePedir."
   });
+  const [pairingPhone, setPairingPhone] = useState(settings.whatsapp ?? "");
   const [templateDrafts, setTemplateDrafts] = useState<Record<string, TemplateDraft>>({});
 
   const whatsappStartMutation = useMutation({
@@ -62,6 +77,14 @@ export function AdminWhatsapp() {
       toast.success("QR Code atualizado.");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel atualizar o QR Code.")
+  });
+  const whatsappPairingMutation = useMutation({
+    mutationFn: whatsappService.requestPairingCode,
+    onSuccess: (session) => {
+      queryClient.setQueryData(["tenant-whatsapp-session", tenant.id], session);
+      toast.success("Codigo de pareamento gerado.");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Nao foi possivel gerar o codigo.")
   });
   const whatsappStopMutation = useMutation({
     mutationFn: whatsappService.stopSession,
@@ -107,6 +130,7 @@ export function AdminWhatsapp() {
       ...current,
       phone: settings.whatsapp ?? current.phone
     }));
+    setPairingPhone((current) => settings.whatsapp ?? current);
   }, [settings.whatsapp]);
 
   useEffect(() => {
@@ -132,6 +156,7 @@ export function AdminWhatsapp() {
   const whatsappBusy =
     whatsappStartMutation.isPending ||
     whatsappQrMutation.isPending ||
+    whatsappPairingMutation.isPending ||
     whatsappStopMutation.isPending ||
     whatsappSettingsMutation.isPending ||
     whatsappTestMutation.isPending;
@@ -194,9 +219,9 @@ export function AdminWhatsapp() {
           <div className={`whatsapp-status ${whatsappConnected ? "connected" : ""}`}>
             <div>
               <span>Status</span>
-              <strong>{whatsappQuery.isLoading ? "Carregando" : whatsappSession?.status ?? "Nao configurado"}</strong>
+              <strong>{whatsappQuery.isLoading ? "Carregando" : sessionStatusLabels[whatsappSession?.status ?? ""] ?? "Nao configurado"}</strong>
             </div>
-            {whatsappSession?.sessionName && <code>{whatsappSession.sessionName}</code>}
+            {whatsappSession?.sessionName && <code>{whatsappSession.provider ?? "WAHA"} - {whatsappSession.sessionName}</code>}
           </div>
 
           {whatsappSession?.lastError && <p className="form-error">{whatsappSession.lastError}</p>}
@@ -213,6 +238,32 @@ export function AdminWhatsapp() {
               <QrCode size={34} />
             </div>
           )}
+
+          {whatsappSession?.provider === "BAILEYS" ? (
+            <div className="pairing-code-box">
+              <label className="field">
+                <span>Telefone para codigo</span>
+                <div>
+                  <input onChange={(event) => setPairingPhone(event.target.value)} value={pairingPhone} />
+                </div>
+              </label>
+              {whatsappSession.pairingCode ? (
+                <div className="pairing-code-value">
+                  <span>Codigo</span>
+                  <strong>{whatsappSession.pairingCode}</strong>
+                </div>
+              ) : null}
+              <button
+                className="ghost-icon-button"
+                disabled={!whatsappSession || whatsappBusy || whatsappConnected}
+                onClick={() => whatsappPairingMutation.mutate({ phoneNumber: pairingPhone })}
+                type="button"
+              >
+                {whatsappPairingMutation.isPending ? <Loader2 className="spin" size={18} /> : <KeyRound size={18} />}
+                Gerar codigo
+              </button>
+            </div>
+          ) : null}
 
           <div className="whatsapp-actions">
             <button className="primary-button" disabled={whatsappBusy} onClick={() => whatsappStartMutation.mutate()} type="button">

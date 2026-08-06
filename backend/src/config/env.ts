@@ -21,8 +21,16 @@ const envSchema = z.object({
   WAHA_API_KEY: z.string().optional(),
   WAHA_WEBHOOK_SECRET: z.string().optional(),
   WAHA_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(15_000),
+  WHATSAPP_PROVIDER: z.enum(["WAHA", "BAILEYS"]).default("WAHA"),
   WHATSAPP_AUTO_REPLY_DELAY_MS: z.coerce.number().int().min(0).max(10_000).default(2_000),
   WHATSAPP_AUTO_REPLY_COOLDOWN_MS: z.coerce.number().int().min(0).max(24 * 60 * 60_000).default(2 * 60_000),
+  WHATSAPP_SEND_MIN_DELAY_MS: z.coerce.number().int().min(0).max(60_000).default(750),
+  WHATSAPP_SEND_MAX_DELAY_MS: z.coerce.number().int().min(0).max(120_000).default(2_500),
+  WHATSAPP_SEND_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
+  BAILEYS_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
+  BAILEYS_DEFAULT_QUERY_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
+  BAILEYS_KEEP_ALIVE_INTERVAL_MS: z.coerce.number().int().min(5_000).max(120_000).default(20_000),
+  BAILEYS_QR_TIMEOUT_MS: z.coerce.number().int().min(10_000).max(180_000).default(60_000),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().default(120)
 });

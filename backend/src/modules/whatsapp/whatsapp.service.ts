@@ -4,6 +4,15 @@ import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
 import { getSocketServer } from "../../config/socket.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import {
+  requestBaileysPairingCode,
+  sendBaileysTextMessage,
+  setBaileysIncomingMessageHandler,
+  startBaileysSession,
+  startConnectedBaileysSessions,
+  stopBaileysSession,
+  type BaileysIncomingMessagePayload
+} from "./baileys-session-manager.js";
 import { wahaBaseUrl, wahaQrRequest, wahaRequest, wahaRequestWithMeta } from "./waha.client.js";
 
 type WahaWebhookBody = {
@@ -259,6 +268,15 @@ const resolveAutoReplyChatId = (input: { chatId: string; customerPhone?: string 
 const getPayloadQrCode = (payload: Record<string, unknown>) =>
   asString(payload.qr) ?? asString(payload.qrCode) ?? asString(payload.image);
 
+const safeJson = (value: unknown): Prisma.InputJsonValue =>
+  JSON.parse(
+    JSON.stringify(value, (_key, item) => {
+      if (Buffer.isBuffer(item)) return { type: "Buffer", data: item.toString("base64") };
+      if (item instanceof Uint8Array) return { type: "Buffer", data: Buffer.from(item).toString("base64") };
+      return item;
+    })
+  ) as Prisma.InputJsonValue;
+
 const logWhatsapp = (level: "info" | "warn" | "error", message: string, meta: Record<string, unknown> = {}) => {
   const safeMeta = {
     ...meta,
@@ -414,14 +432,18 @@ export const mapSession = (session: Awaited<ReturnType<typeof prisma.whatsappSes
         id: session.id,
         tenantId: session.tenantId,
         sessionName: session.sessionName,
+        provider: session.provider,
         phoneNumber: session.phoneNumber,
         displayName: session.displayName,
         status: session.status,
         qrCode: session.qrCode,
+        pairingCode: session.pairingCode,
         autoReplyEnabled: session.autoReplyEnabled,
         notifyOrderStatus: session.notifyOrderStatus,
         welcomeMessage: session.welcomeMessage,
         lastStatusAt: session.lastStatusAt,
+        lastQrAt: session.lastQrAt,
+        lastPairingCodeAt: session.lastPairingCodeAt,
         connectedAt: session.connectedAt,
         disconnectedAt: session.disconnectedAt,
         lastError: session.lastError,
@@ -504,6 +526,11 @@ export const getSession = async (tenantId: string) => {
     return null;
   }
 
+  if (session.provider === "BAILEYS") {
+    await ensureDefaultTemplates(tenantId, session.id);
+    return mapSession(session);
+  }
+
   const synced = await syncSessionStatusFromWaha(session).catch(async (error) => {
     if (getWahaStatus(error) === 404) {
       return prisma.whatsappSession.update({
@@ -581,22 +608,31 @@ export const createOrStartSession = async (tenantId: string): Promise<ReturnType
   }
 
   const sessionName = sessionNameForTenant(tenant.slug);
+  const provider = env.WHATSAPP_PROVIDER;
   const session = await prisma.whatsappSession.upsert({
     where: { tenantId },
     create: {
       tenantId,
       sessionName,
-      status: "PENDING_QR",
+      provider,
+      status: provider === "BAILEYS" ? "CONNECTING" : "PENDING_QR",
       welcomeMessage: defaultWelcomeMessage(tenant)
     },
     update: {
       sessionName,
-      status: "PENDING_QR",
+      provider,
+      status: provider === "BAILEYS" ? "CONNECTING" : "PENDING_QR",
       lastError: null,
       lastStatusAt: new Date()
     }
   });
   await ensureDefaultTemplates(tenantId, session.id);
+
+  if (provider === "BAILEYS") {
+    await startBaileysSession(tenantId, session.id);
+    const updated = await prisma.whatsappSession.findUnique({ where: { id: session.id } });
+    return mapSession(updated);
+  }
 
   const currentWahaSession = await wahaRequest<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(sessionName)}`, { timeoutMs: 5_000 }).catch(() => null);
   const currentWahaStatus = asString(currentWahaSession?.status);
@@ -707,11 +743,52 @@ export const syncConnectedSessionWebhooks = async () => {
   }
 };
 
+export const startConnectedWhatsappSessions = async () => {
+  await startConnectedBaileysSessions();
+
+  if (env.WHATSAPP_PROVIDER === "WAHA") {
+    await syncConnectedSessionWebhooks();
+  }
+};
+
+export const requestPairingCode = async (tenantId: string, phoneNumber: string) => {
+  const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+
+  if (!session) {
+    await createOrStartSession(tenantId);
+  }
+
+  const currentSession = await prisma.whatsappSession.findUnique({ where: { tenantId } });
+
+  if (!currentSession) {
+    throw new AppError("WhatsApp session not found", 404);
+  }
+
+  if (currentSession.provider !== "BAILEYS") {
+    throw new AppError("Pairing code is only available for Baileys sessions", 409, {
+      code: "WHATSAPP_PAIRING_CODE_UNAVAILABLE"
+    });
+  }
+
+  return requestBaileysPairingCode(tenantId, currentSession.id, phoneNumber);
+};
+
 export const refreshSessionQr = async (tenantId: string): Promise<ReturnType<typeof mapSession>> => {
   const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
 
   if (!session) {
     throw new AppError("WhatsApp session not found", 404);
+  }
+
+  if (session.provider === "BAILEYS") {
+    if (!["CONNECTED", "PENDING_QR", "CONNECTING", "RECONNECTING", "PENDING_PAIRING_CODE"].includes(session.status)) {
+      await startBaileysSession(tenantId, session.id);
+    } else if (!session.qrCode && session.status !== "CONNECTED") {
+      await startBaileysSession(tenantId, session.id);
+    }
+
+    const updated = await prisma.whatsappSession.findUnique({ where: { id: session.id } });
+    return mapSession(updated);
   }
 
   const syncedSession = await syncSessionStatusFromWaha(session).catch(async (error) => {
@@ -804,6 +881,10 @@ export const stopSession = async (tenantId: string) => {
     throw new AppError("WhatsApp session not found", 404);
   }
 
+  if (session.provider === "BAILEYS") {
+    return stopBaileysSession(tenantId, session.id);
+  }
+
   await wahaRequest(`/api/sessions/${encodeURIComponent(session.sessionName)}`, { method: "DELETE" }).catch(async (error) => {
     if (getWahaStatus(error) !== 404) {
       throw error;
@@ -848,6 +929,18 @@ export const updateSettings = async (tenantId: string, data: SessionSettingsInpu
 export const getWahaConnectivityHealth = async (tenantId: string) => {
   const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });
   const startedAt = Date.now();
+
+  if (session?.provider === "BAILEYS") {
+    return {
+      ok: true,
+      provider: "BAILEYS",
+      wahaReachable: null,
+      sessionName: session.sessionName,
+      internalStatus: session.status,
+      latencyMs: Date.now() - startedAt,
+      checkedAt: new Date().toISOString()
+    };
+  }
 
   try {
     const sessionsResult = await wahaRequestWithMeta<unknown>("/api/sessions", { timeoutMs: 5_000 });
@@ -921,6 +1014,42 @@ export const sendTextMessage = async (tenantId: string, phone: string, text: str
 
   if (!session) {
     throw new AppError("WhatsApp session not found", 404);
+  }
+
+  if (session.provider === "BAILEYS") {
+    if (session.status !== "CONNECTED") {
+      throw new AppError("WhatsApp session is not connected", 409, {
+        code: "BAILEYS_SESSION_NOT_READY",
+        source: options.source ?? "manual"
+      });
+    }
+
+    const chatId = toChatId(phone);
+    const result = await sendBaileysTextMessage(tenantId, session.id, phone, text);
+
+    await prisma.whatsappMessage.create({
+      data: {
+        tenantId,
+        sessionId: session.id,
+        externalId: result.messageId,
+        direction: "OUTBOUND",
+        chatId,
+        to: chatId,
+        body: text,
+        rawPayload: safeJson(result.raw),
+        sentAt: new Date()
+      }
+    }).catch((error) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return;
+      throw error;
+    });
+
+    return {
+      sent: true,
+      provider: "BAILEYS",
+      messageId: result.messageId,
+      chatId: result.jid
+    };
   }
 
   const wahaSession = await wahaRequest<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(session.sessionName)}`, { timeoutMs: 5_000 }).catch(async (error) => {
@@ -1328,6 +1457,36 @@ const handleIncomingMessage = async (
     });
   }
 };
+
+const handleIncomingBaileysMessage = async (sessionId: string, payload: BaileysIncomingMessagePayload) => {
+  const session = await prisma.whatsappSession.findUnique({
+    where: { id: sessionId },
+    include: { tenant: { include: { settings: true } } }
+  });
+
+  if (!session || session.provider !== "BAILEYS") {
+    logWhatsapp("warn", "Baileys incoming message session not found", { sessionId });
+    return;
+  }
+
+  await handleIncomingMessage(session, {
+    id: payload.providerMessageId,
+    messageId: payload.providerMessageId,
+    chatId: payload.chatId,
+    from: payload.from ?? payload.chatId,
+    to: payload.to,
+    fromMe: payload.fromMe,
+    body: payload.body,
+    text: payload.body,
+    type: payload.type,
+    pushName: payload.pushName,
+    timestamp: payload.timestamp,
+    provider: "baileys",
+    rawMessage: safeJson(payload.rawMessage)
+  });
+};
+
+setBaileysIncomingMessageHandler(handleIncomingBaileysMessage);
 
 export const notifyOrderStatusChanged = async (tenantId: string, orderId: string) => {
   const session = await prisma.whatsappSession.findUnique({ where: { tenantId } });

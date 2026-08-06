@@ -25,7 +25,16 @@ export type PaymentStatus =
   | "CANCELLED";
 export type PaymentType = "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "PIX" | "VOUCHER" | "ONLINE";
 export type DiscountType = "PERCENTAGE" | "FIXED_AMOUNT" | "FREE_DELIVERY";
-export type WhatsappSessionStatus = "PENDING_QR" | "CONNECTED" | "DISCONNECTED" | "ERROR";
+export type WhatsappSessionStatus =
+  | "CONNECTING"
+  | "PENDING_QR"
+  | "PENDING_PAIRING_CODE"
+  | "CONNECTED"
+  | "RECONNECTING"
+  | "DISCONNECTED"
+  | "LOGGED_OUT"
+  | "ERROR";
+export type WhatsappProvider = "WAHA" | "BAILEYS";
 export type WhatsappTemplateTrigger =
   | "WELCOME"
   | "ORDER_PLACED"
@@ -86,14 +95,18 @@ export type TenantSettings = {
 export type WhatsappSession = BaseEntity & {
   tenantId: string;
   sessionName: string;
+  provider?: WhatsappProvider;
   phoneNumber?: string | null;
   displayName?: string | null;
   status: WhatsappSessionStatus;
   qrCode?: string | null;
+  pairingCode?: string | null;
   autoReplyEnabled: boolean;
   notifyOrderStatus: boolean;
   welcomeMessage?: string | null;
   lastStatusAt?: string | null;
+  lastQrAt?: string | null;
+  lastPairingCodeAt?: string | null;
   connectedAt?: string | null;
   disconnectedAt?: string | null;
   lastError?: string | null;
