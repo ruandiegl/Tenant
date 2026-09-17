@@ -1,5 +1,5 @@
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { ChefHat, Menu as MenuIcon, ReceiptText, ShoppingBag, UserRound } from "lucide-react";
+import { ChefHat, Menu as MenuIcon, ReceiptText, ShoppingCart, UserRound } from "lucide-react";
 import { AdminLayout } from "../app/layouts/admin-layout";
 import { SuperAdminLayout } from "../app/layouts/superadmin-layout";
 import { ProtectedRoute } from "./protected-route";
@@ -25,7 +25,14 @@ import { OrderTracking } from "../pages/customer/order-tracking";
 import { useCustomerFlow } from "../app/providers/customer-flow-provider";
 import { DEFAULT_PUBLIC_TENANT_SLUG, getPublicTenantSlug, publicTenantPath } from "../utils/public-tenant-route";
 
-const staffNavItems = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof ChefHat;
+  badge?: number;
+};
+
+const staffNavItems: NavItem[] = [
   { to: "/cozinha", label: "Cozinha", icon: ChefHat }
 ];
 
@@ -35,11 +42,12 @@ export function AppRoutes() {
 
 function RouteShell() {
   const location = useLocation();
-  const { order } = useCustomerFlow();
+  const { order, items } = useCustomerFlow();
   const publicTenantSlug = getPublicTenantSlug(location.pathname) ?? DEFAULT_PUBLIC_TENANT_SLUG;
-  const customerNavItems = [
+  const cartQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const customerNavItems: NavItem[] = [
     { to: publicTenantPath(publicTenantSlug, "/menu"), label: "Menu", icon: MenuIcon },
-    { to: publicTenantPath(publicTenantSlug, "/carrinho"), label: "Carrinho", icon: ShoppingBag },
+    { to: publicTenantPath(publicTenantSlug, "/carrinho"), label: "Carrinho", icon: ShoppingCart, badge: cartQuantity },
     { to: publicTenantPath(publicTenantSlug, "/pedido"), label: "Pedido", icon: ReceiptText },
     { to: publicTenantPath(publicTenantSlug, "/perfil"), label: "Perfil", icon: UserRound }
   ];
@@ -48,7 +56,7 @@ function RouteShell() {
   const isLegacyCustomerRoute = location.pathname.startsWith("/cliente");
   const isCustomerRoute = Boolean(getPublicTenantSlug(location.pathname)) || isLegacyCustomerRoute;
   const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/superadmin");
-  const navItems = isCustomerRoute ? customerNavItems : staffNavItems;
+  const navItems: NavItem[] = isCustomerRoute ? customerNavItems : staffNavItems;
 
   return (
     <div className={`app-shell ${isAdminRoute ? "admin-shell-active" : ""}`}>
@@ -229,7 +237,18 @@ function RouteShell() {
         <nav className={`bottom-nav ${isCustomerRoute ? "customer-nav" : "staff-nav"}`} aria-label="Navegacao principal">
           {navItems.map((item) => (
             <NavLink end={item.to.endsWith("/menu") || item.to.endsWith("/perfil")} key={item.to} to={item.to}>
-              <item.icon size={18} aria-hidden="true" />
+              <span className="bottom-nav-icon-container">
+                <item.icon size={18} aria-hidden="true" />
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span
+                    key={item.badge}
+                    className="bottom-nav-badge"
+                    aria-label={`${item.badge} item(ns) no carrinho`}
+                  >
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                )}
+              </span>
               <span>{item.label}</span>
             </NavLink>
           ))}

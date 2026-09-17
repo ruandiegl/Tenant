@@ -32,7 +32,12 @@ const envSchema = z.object({
   BAILEYS_KEEP_ALIVE_INTERVAL_MS: z.coerce.number().int().min(5_000).max(120_000).default(20_000),
   BAILEYS_QR_TIMEOUT_MS: z.coerce.number().int().min(10_000).max(180_000).default(60_000),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
-  RATE_LIMIT_MAX: z.coerce.number().default(120)
+  RATE_LIMIT_MAX: z.coerce.number().default(120),
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET_NAME: z.string().optional(),
+  R2_PUBLIC_URL: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

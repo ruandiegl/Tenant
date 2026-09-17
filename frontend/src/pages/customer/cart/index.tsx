@@ -250,12 +250,22 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
     return usesManualNeighborhoodDelivery ? baseMissing : baseMissing || !address.postalCode;
   }, [address.district, address.number, address.postalCode, address.street, fulfillment.type, usesManualNeighborhoodDelivery]);
   const pageTitle =
-    step === "cart" ? "Revise seu pedido" : step === "address" ? "Endereco de entrega" : step === "payment" ? "Pagamento" : "Pedido confirmado";
+    step === "cart"
+      ? "Revise seu pedido"
+      : step === "address"
+        ? fulfillment.type === "PICKUP"
+          ? "Identificacao para retirada"
+          : "Endereco de entrega"
+        : step === "payment"
+          ? "Pagamento"
+          : "Pedido confirmado";
   const pageDescription =
     step === "cart"
       ? "Confira os itens antes de continuar."
       : step === "address"
-        ? "Informe onde deseja receber o pedido."
+        ? fulfillment.type === "PICKUP"
+          ? "Informe seu nome e WhatsApp para retirar o pedido na loja."
+          : "Informe onde deseja receber o pedido."
         : step === "payment"
           ? "Escolha a forma de pagamento para confirmar."
           : "Seu pedido foi recebido pela loja.";
@@ -442,6 +452,20 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
     usesManualNeighborhoodDelivery
   ]);
 
+  useEffect(() => {
+    if (step === "payment") {
+      if (fulfillment.type === "PICKUP") {
+        const trimmedName = profile.name.trim();
+        const phoneDigits = onlyDigits(profile.phone);
+        if (trimmedName.length < 2 || phoneDigits.length < 10) {
+          navigate(tenantPath("/carrinho/endereco"), { replace: true });
+        }
+      } else if (fulfillment.type === "DELIVERY" && missingAddress) {
+        navigate(tenantPath("/carrinho/endereco"), { replace: true });
+      }
+    }
+  }, [fulfillment.type, missingAddress, navigate, profile.name, profile.phone, step, tenantPath]);
+
   const nextStep = () => {
     setError(null);
 
@@ -460,6 +484,28 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       if (items.length === 0) {
         toast.info("Escolha pelo menos um item antes de continuar.");
         navigate(tenantPath("/carrinho"));
+        return;
+      }
+
+      if (fulfillment.type === "PICKUP") {
+        const trimmedName = profile.name.trim();
+        const phoneDigits = onlyDigits(profile.phone);
+
+        if (!trimmedName || trimmedName.length < 2) {
+          const message = "Informe seu nome para retirada.";
+          setError(message);
+          toast.warning(message);
+          return;
+        }
+
+        if (phoneDigits.length < 10) {
+          const message = "Informe seu WhatsApp com DDD para retirada.";
+          setError(message);
+          toast.warning(message);
+          return;
+        }
+
+        navigate(tenantPath("/carrinho/pagamento"));
         return;
       }
 
@@ -510,11 +556,32 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
       return;
     }
 
-    if (!profile.name || profile.name.trim().length < 2) {
-      setError("Informe o nome para contato antes de confirmar.");
-      toast.warning("Informe o nome para contato antes de confirmar.");
-      navigate(tenantPath("/carrinho/endereco"));
-      return;
+    if (fulfillment.type === "PICKUP") {
+      const trimmedName = profile.name.trim();
+      const phoneDigits = onlyDigits(profile.phone);
+
+      if (!trimmedName || trimmedName.length < 2) {
+        const message = "Informe seu nome para retirada antes de confirmar.";
+        setError(message);
+        toast.warning(message);
+        navigate(tenantPath("/carrinho/endereco"));
+        return;
+      }
+
+      if (phoneDigits.length < 10) {
+        const message = "Informe seu WhatsApp com DDD para retirada antes de confirmar.";
+        setError(message);
+        toast.warning(message);
+        navigate(tenantPath("/carrinho/endereco"));
+        return;
+      }
+    } else {
+      if (!profile.name || profile.name.trim().length < 2) {
+        setError("Informe o nome para contato antes de confirmar.");
+        toast.warning("Informe o nome para contato antes de confirmar.");
+        navigate(tenantPath("/carrinho/endereco"));
+        return;
+      }
     }
 
     if (deliveryMethodUnavailable || manualNeighborhoodDeliveryUnavailable) {
@@ -745,25 +812,46 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
             </div>
             <div className="form-grid two-columns">
               <label className="field">
-                <span>Nome para contato</span>
+                <span>
+                  Nome para contato
+                  {fulfillment.type === "PICKUP" ? <strong className="required-asterisk">*</strong> : null}
+                </span>
                 <div>
                   <UserRound size={18} />
-                  <input value={profile.name} onChange={(event) => updateProfile({ name: event.target.value })} placeholder="Seu nome" />
+                  <input
+                    value={profile.name}
+                    onChange={(event) => {
+                      setError(null);
+                      updateProfile({ name: event.target.value });
+                    }}
+                    placeholder="Seu nome completo"
+                  />
                 </div>
               </label>
               <label className="field">
-                <span>WhatsApp</span>
+                <span>
+                  WhatsApp
+                  {fulfillment.type === "PICKUP" ? <strong className="required-asterisk">*</strong> : null}
+                </span>
                 <div>
                   <Phone size={18} />
                   <input
                     autoComplete="tel"
                     inputMode="tel"
                     value={profile.phone}
-                    onChange={(event) => updateProfile({ phone: formatPhone(event.target.value) })}
+                    onChange={(event) => {
+                      setError(null);
+                      updateProfile({ phone: formatPhone(event.target.value) });
+                    }}
                     placeholder="(11) 90000-0000"
                   />
                 </div>
               </label>
+              {fulfillment.type === "PICKUP" ? (
+                <small className="pickup-required-notice">
+                  * Nome e WhatsApp com DDD sao obrigatorios para identificacao na retirada.
+                </small>
+              ) : null}
               {fulfillment.type === "DELIVERY" ? (
                 <>
                   {usesManualNeighborhoodDelivery ? (
@@ -877,7 +965,7 @@ export function CustomerCart({ step }: { step: CheckoutStep }) {
                   <ShoppingBag size={20} />
                   <div>
                     <strong>Retirada na loja selecionada</strong>
-                    <span>Voce nao precisa cadastrar endereco. Avisaremos quando o pedido estiver pronto.</span>
+                    <span>Voce nao precisa cadastrar endereco. Avisaremos pelo WhatsApp quando o pedido estiver pronto para retirada.</span>
                   </div>
                 </div>
               )}

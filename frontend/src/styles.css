@@ -59,21 +59,31 @@ img {
 }
 
 .Toastify__toast-container {
-  bottom: calc(84px + env(safe-area-inset-bottom));
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-  width: min(320px, calc(100vw - 56px));
+  bottom: auto !important;
+  box-sizing: border-box;
+  left: 50% !important;
+  max-width: calc(100vw - 28px) !important;
+  padding: 0 !important;
+  pointer-events: none;
+  right: auto !important;
+  top: calc(14px + env(safe-area-inset-top)) !important;
+  transform: translateX(-50%) !important;
+  width: min(380px, calc(100vw - 28px)) !important;
+  z-index: 99999;
 }
 
 .Toastify__toast {
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
   cursor: pointer;
   font-family: inherit;
-  margin-bottom: 6px;
-  min-height: 42px;
-  padding: 8px 10px;
+  height: auto !important;
+  margin: 0 0 8px 0;
+  max-height: none !important;
+  min-height: 44px;
+  padding: 10px 14px;
+  pointer-events: auto;
+  width: 100% !important;
 }
 
 .Toastify__toast-body {
@@ -183,6 +193,51 @@ img {
 
 .bottom-nav a.active {
   color: var(--brand);
+}
+
+.bottom-nav-icon-container {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  position: relative;
+}
+
+.bottom-nav-badge {
+  align-items: center;
+  animation: nav-badge-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  background: #2563eb;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px #ffffff;
+  color: #ffffff;
+  display: inline-flex;
+  font-family: var(--font-data);
+  font-size: 0.65rem;
+  font-weight: 800;
+  height: 18px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 18px;
+  padding: 0 4px;
+  pointer-events: none;
+  position: absolute;
+  right: -9px;
+  top: -7px;
+  z-index: 2;
+}
+
+@keyframes nav-badge-pop {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.3);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.22);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .eyebrow {
@@ -484,11 +539,12 @@ img {
 
 @media (min-width: 1040px) {
   .Toastify__toast-container {
-    bottom: 22px;
-    left: auto;
-    right: 22px;
-    transform: none;
-    width: min(420px, calc(100vw - 32px));
+    bottom: 22px !important;
+    left: auto !important;
+    right: 22px !important;
+    top: auto !important;
+    transform: none !important;
+    width: min(420px, calc(100vw - 32px)) !important;
   }
 
   .bottom-nav {

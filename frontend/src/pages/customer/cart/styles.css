@@ -110,12 +110,28 @@
 .checkout-actions {
   justify-self: stretch;
   justify-content: flex-end;
+  margin-bottom: 28px;
   overflow: visible;
   scroll-snap-type: none;
 }
 
 .checkout-actions button {
   width: 100%;
+}
+
+.required-asterisk {
+  color: #ef4444;
+  font-weight: 800;
+  margin-left: 2px;
+}
+
+.pickup-required-notice {
+  color: var(--muted);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  grid-column: 1 / -1;
+  margin-top: -4px;
 }
 
 .cart-item-card {

@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import { r2Storage } from "../../shared/storage/r2.service.js";
 import { resolveTenantSlugAlias } from "../../shared/tenant-slug-aliases.js";
 
 type CategoryInput = {
@@ -194,12 +195,22 @@ const saveProductUpload = async (tenantId: string, productId: string, upload?: I
   const extension = imageExtensions[upload.mimeType];
   const fileName = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
   const relativePath = path.join("products", tenantId, productId);
-  const uploadDir = path.resolve(process.cwd(), "uploads", relativePath);
 
-  await fs.mkdir(uploadDir, { recursive: true });
-  await fs.writeFile(path.join(uploadDir, fileName), buffer);
+  let url: string;
 
-  const url = `/uploads/${relativePath.replace(/\\/g, "/")}/${fileName}`;
+  if (r2Storage.isConfigured) {
+    const key = `products/${tenantId}/${productId}/${fileName}`;
+    url = await r2Storage.upload({
+      key,
+      body: buffer,
+      contentType: upload.mimeType
+    });
+  } else {
+    const uploadDir = path.resolve(process.cwd(), "uploads", relativePath);
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.writeFile(path.join(uploadDir, fileName), buffer);
+    url = `/uploads/${relativePath.replace(/\\/g, "/")}/${fileName}`;
+  }
 
   await prisma.productImage.create({
     data: {

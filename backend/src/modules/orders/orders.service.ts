@@ -1,4 +1,5 @@
 import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
+import { env } from "../../config/env.js";
 import { prisma } from "../../config/prisma.js";
 import { getSocketServer } from "../../config/socket.js";
 import { AppError } from "../../shared/errors/app-error.js";
@@ -242,6 +243,10 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
 
   if (data.type === "DELIVERY" && !data.deliveryAddress) {
     throw new AppError("Delivery address is required for delivery orders", 400);
+  }
+
+  if (isPixOnlinePayment(data.payment) && !env.ASAAS_API_KEY) {
+    throw new AppError("Pagamento PIX online indisponivel no momento. Escolha outra forma de pagamento.", 400);
   }
 
   const requestedProductIds = Array.from(new Set(data.items.map((item) => item.productId)));
@@ -501,15 +506,42 @@ export const createPublicOrder = async (tenantSlug: string, data: CreateOrderInp
   });
 
   if (isPixOnlinePayment(data.payment)) {
-    await createPixPaymentForOrder({
-      tenantId: tenant.id,
-      orderId: order.id,
-      publicCode: order.publicCode,
-      customerName: data.customerName,
-      customerPhone: data.customerPhone,
-      customerEmail: data.customerEmail,
-      total: Number(total)
-    });
+    try {
+      await createPixPaymentForOrder({
+        tenantId: tenant.id,
+        orderId: order.id,
+        publicCode: order.publicCode,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        customerEmail: data.customerEmail,
+        total: Number(total)
+      });
+    } catch (paymentError) {
+      // Rollback the created order so a failed payment attempt never leaves a ghost order in the database
+      await prisma.$transaction(async (tx) => {
+        await tx.order.delete({ where: { id: order.id } });
+
+        if (coupon) {
+          await tx.couponRedemption.deleteMany({ where: { orderId: order.id } });
+        }
+
+        for (const item of preparedItems) {
+          await tx.productAvailability.updateMany({
+            where: {
+              tenantId: tenant.id,
+              productId: item.productId,
+              branchId: branch.id
+            },
+            data: {
+              stockQuantity: { increment: item.quantity },
+              isAvailable: true
+            }
+          });
+        }
+      });
+
+      throw paymentError;
+    }
   }
 
   emitOrderEvent("order.created", order);

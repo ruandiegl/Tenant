@@ -35,9 +35,9 @@ export function AppProviders({ children }: PropsWithChildren) {
       <ToastContainer
         autoClose={3200}
         closeOnClick
-        newestOnTop={false}
+        newestOnTop
         pauseOnFocusLoss={false}
-        position="bottom-right"
+        position="top-center"
         theme="colored"
       />
     </QueryClientProvider>
