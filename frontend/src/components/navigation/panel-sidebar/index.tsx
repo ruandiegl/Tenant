@@ -1,7 +1,6 @@
 import "./styles.css";
 import { useEffect } from "react";
-import { ChevronDown, LogOut, Menu, X, type LucideIcon } from "lucide-react";
-import { Collapsible } from "radix-ui";
+import { LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { BrandLogo } from "../../brand-logo";
 import { Avatar, AvatarFallback } from "../../ui/avatar";
@@ -23,7 +22,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
   SidebarTrigger,
   useSidebar
 } from "../../ui/sidebar";
@@ -38,17 +36,17 @@ export type PanelSidebarItem = {
 
 export type PanelSidebarGroup = {
   label: string;
-  icon: LucideIcon;
   items: PanelSidebarItem[];
+  icon?: LucideIcon;
 };
 
 type PanelSidebarProps = {
   ariaLabel: string;
   brandTitle: string;
   brandSubtitle: string;
-  primaryLabel?: string;
-  primaryItems: PanelSidebarItem[];
   groups?: PanelSidebarGroup[];
+  primaryLabel?: string;
+  primaryItems?: PanelSidebarItem[];
   secondaryLabel?: string;
   secondaryItems?: PanelSidebarItem[];
   userName: string;
@@ -91,49 +89,14 @@ function SidebarLink({ item, mobile = false }: { item: PanelSidebarItem; mobile?
   );
 }
 
-function SidebarNestedGroup({ group, mobile = false }: { group: PanelSidebarGroup; mobile?: boolean }) {
-  const location = useLocation();
-  const { setOpen, state } = useSidebar();
-  const active = group.items.some((item) => isRouteActive(location.pathname, item));
-
-  return (
-    <Collapsible.Root className="panel-sidebar-collapsible" defaultOpen={active}>
-      <SidebarMenuItem>
-        <Collapsible.Trigger asChild>
-          <SidebarMenuButton
-            className="panel-sidebar-group-trigger"
-            isActive={active}
-            onClick={() => !mobile && state === "collapsed" && setOpen(true)}
-          >
-            <span className="panel-sidebar-link-icon">
-              <group.icon aria-hidden="true" />
-            </span>
-            <span>{group.label}</span>
-            <ChevronDown className="panel-sidebar-collapsible-chevron" aria-hidden="true" />
-          </SidebarMenuButton>
-        </Collapsible.Trigger>
-        <Collapsible.Content>
-          <SidebarMenuSub>
-            {group.items.map((item) => (
-              <SidebarMenuItem key={item.to}>
-                <SidebarLink item={item} mobile={mobile} />
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenuSub>
-        </Collapsible.Content>
-      </SidebarMenuItem>
-    </Collapsible.Root>
-  );
-}
-
 function PanelSidebarNavigation({
   brandTitle,
   brandSubtitle,
   primaryLabel = "Principal",
   primaryItems,
-  groups = [],
+  groups,
   secondaryLabel = "Sistema",
-  secondaryItems = [],
+  secondaryItems,
   userName,
   userEmail,
   contextIcon: ContextIcon,
@@ -156,6 +119,18 @@ function PanelSidebarNavigation({
     onLogout();
   };
 
+  const resolvedGroups: PanelSidebarGroup[] =
+    groups && groups.length > 0
+      ? groups
+      : [
+          ...(primaryItems && primaryItems.length > 0
+            ? [{ label: primaryLabel, items: primaryItems }]
+            : []),
+          ...(secondaryItems && secondaryItems.length > 0
+            ? [{ label: secondaryLabel, items: secondaryItems }]
+            : [])
+        ];
+
   return (
     <>
       <SidebarHeader className="panel-sidebar-header">
@@ -176,38 +151,12 @@ function PanelSidebarNavigation({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>{primaryLabel}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {primaryItems.map((item) => (
-                <SidebarMenuItem key={item.to}>
-                  <SidebarLink item={item} mobile={mobile} />
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {groups.length > 0 ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>Operacao</SidebarGroupLabel>
+        {resolvedGroups.map((group) => (
+          <SidebarGroup key={group.label}>
+            {group.label ? <SidebarGroupLabel>{group.label}</SidebarGroupLabel> : null}
             <SidebarGroupContent>
               <SidebarMenu>
-                {groups.map((group) => (
-                  <SidebarNestedGroup group={group} key={group.label} mobile={mobile} />
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ) : null}
-
-        {secondaryItems.length > 0 ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>{secondaryLabel}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {secondaryItems.map((item) => (
+                {group.items.map((item) => (
                   <SidebarMenuItem key={item.to}>
                     <SidebarLink item={item} mobile={mobile} />
                   </SidebarMenuItem>
@@ -215,7 +164,7 @@ function PanelSidebarNavigation({
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        ) : null}
+        ))}
       </SidebarContent>
 
       <SidebarFooter>

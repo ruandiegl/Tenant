@@ -46,32 +46,6 @@
   width: 18px;
 }
 
-.panel-sidebar-group-trigger {
-  grid-template-columns: 26px minmax(0, 1fr) 16px;
-}
-
-.panel-sidebar-group-trigger[data-active="true"] {
-  background: transparent;
-  box-shadow: none;
-  color: var(--sidebar-foreground);
-}
-
-.panel-sidebar-group-trigger[data-active="true"] > .panel-sidebar-link-icon {
-  color: var(--sidebar-foreground);
-}
-
-.panel-sidebar-collapsible-chevron {
-  background: transparent !important;
-  height: 15px !important;
-  padding: 0 !important;
-  transition: transform 180ms ease;
-  width: 15px !important;
-}
-
-.panel-sidebar-collapsible[data-state="open"] .panel-sidebar-collapsible-chevron {
-  transform: rotate(180deg);
-}
-
 .panel-sidebar-account {
   align-items: center;
   display: grid;

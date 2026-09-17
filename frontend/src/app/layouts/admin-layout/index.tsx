@@ -8,11 +8,24 @@ import { SidebarInset, SidebarProvider } from "../../../components/ui/sidebar";
 import { useAuth } from "../../providers/auth-provider";
 import { useTenant } from "../../providers/tenant-provider";
 
-const dashboardItem = { to: "/admin", label: "Dashboard", icon: BarChart3, end: true, permission: "tenant.reports.read" };
-const adminNavGroups = [
+type AdminNavItem = PanelSidebarItem & {
+  permission: string;
+};
+
+type AdminNavGroupDef = {
+  label: string;
+  items: AdminNavItem[];
+};
+
+const adminNavGroupDefs: AdminNavGroupDef[] = [
+  {
+    label: "Principal",
+    items: [
+      { to: "/admin", label: "Dashboard", icon: BarChart3, end: true, permission: "tenant.reports.read" }
+    ]
+  },
   {
     label: "Cozinha",
-    icon: ChefHat,
     items: [
       { to: "/admin/pedidos", label: "Pedidos", icon: ReceiptText, permission: "tenant.orders.read" },
       { to: "/admin/cardapio", label: "Cardapio", icon: MenuIcon, permission: "tenant.menu.read" },
@@ -21,16 +34,18 @@ const adminNavGroups = [
   },
   {
     label: "Logistica",
-    icon: Bike,
     items: [
       { to: "/admin/entregas", label: "Painel de entregas", icon: Bike, permission: "tenant.branches.read", end: true },
       { to: "/admin/entregas/filiais", label: "Cadastro de filiais", icon: Building2, permission: "tenant.branches.read" }
     ]
+  },
+  {
+    label: "Sistema",
+    items: [
+      { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle, permission: "tenant.settings.read" },
+      { to: "/admin/config", label: "Configuracoes", icon: Settings, permission: "tenant.branches.read" }
+    ]
   }
-];
-const adminSupportItems = [
-  { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle, permission: "tenant.settings.read" },
-  { to: "/admin/config", label: "Configuracoes", icon: Settings, permission: "tenant.branches.read" }
 ];
 
 export function AdminLayout({ children }: PropsWithChildren) {
@@ -39,11 +54,12 @@ export function AdminLayout({ children }: PropsWithChildren) {
   const navigate = useNavigate();
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const primaryItems: PanelSidebarItem[] = can(dashboardItem.permission) ? [dashboardItem] : [];
-  const groups: PanelSidebarGroup[] = adminNavGroups
-    .map((group) => ({ ...group, items: group.items.filter((item) => can(item.permission)) }))
+  const groups: PanelSidebarGroup[] = adminNavGroupDefs
+    .map((group) => ({
+      label: group.label,
+      items: group.items.filter((item) => can(item.permission))
+    }))
     .filter((group) => group.items.length > 0);
-  const secondaryItems: PanelSidebarItem[] = adminSupportItems.filter((item) => can(item.permission));
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -66,8 +82,6 @@ export function AdminLayout({ children }: PropsWithChildren) {
         contextLabel="Tenant ativo"
         groups={groups}
         onLogout={() => setLogoutModalOpen(true)}
-        primaryItems={primaryItems}
-        secondaryItems={secondaryItems}
         userEmail={user?.email ?? "admin@podepedir.local"}
         userName={user?.name ?? "Admin"}
       />
